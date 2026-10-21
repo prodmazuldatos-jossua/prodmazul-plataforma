@@ -1,0 +1,19 @@
+# Supabase
+.branches
+.temp
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
+
+# Prodmazul: archivos que no se suben
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+backups/
+supabase/.temp/
+
+dist/
