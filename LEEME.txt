@@ -1,0 +1,10 @@
+PRODMAZUL · FASE 4 · PARTE 1 · Base de datos: núcleo de seguridad, roles y auditoría
+
+Contenido
+  supabase/migrations/   3 migraciones de la base de datos (se aplican con: npx supabase db push)
+  tests/sql/             pruebas automáticas de la base de datos (opcionales)
+  docs/                  consultas de administración (copiar y pegar en el SQL Editor de Supabase)
+  respaldo-diario.ps1    script de copia de seguridad actualizado (reemplaza al de la Fase 3)
+
+Todo se explica paso a paso en la guía: Fase4_Parte1_Guia.html
+No incluye contraseñas, claves ni tokens.
