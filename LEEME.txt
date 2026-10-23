@@ -1,10 +1,11 @@
-PRODMAZUL · FASE 4 · PARTE 1 · Base de datos: núcleo de seguridad, roles y auditoría
+PRODMAZUL · FASE 4 · PARTE 2 · Tablas y reglas de Recepción (base de datos)
 
 Contenido
-  supabase/migrations/   3 migraciones de la base de datos (se aplican con: npx supabase db push)
-  tests/sql/             pruebas automáticas de la base de datos (opcionales)
-  docs/                  consultas de administración (copiar y pegar en el SQL Editor de Supabase)
-  respaldo-diario.ps1    script de copia de seguridad actualizado (reemplaza al de la Fase 3)
+  supabase/migrations/   1 migración nueva (20261020000004_m01_recepcion.sql)
+  tests/sql/             pruebas automáticas de la Parte 2 y package.json actualizado (corre las Partes 1 y 2)
+  docs/                  prueba_parte2.sql (se ejecuta en tu proyecto) y limpiar_recepcion.sql
+  respaldo-diario.ps1    script de copia de seguridad actualizado (incluye el esquema m01_recepcion)
 
-Todo se explica paso a paso en la guía: Fase4_Parte1_Guia.html
+Se copia ENCIMA de la carpeta del repositorio, junto con lo de la Parte 1.
+Todo se explica paso a paso en la guía: Fase4_Parte2_Guia.html
 No incluye contraseñas, claves ni tokens.

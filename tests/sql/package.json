@@ -2,6 +2,10 @@
   "name": "prodmazul-pruebas-sql",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node parte1.mjs" },
+  "scripts": {
+    "test": "node parte1.mjs && node parte2.mjs",
+    "test:parte1": "node parte1.mjs",
+    "test:parte2": "node parte2.mjs"
+  },
   "devDependencies": { "@electric-sql/pglite": "^0.5.10" }
 }
