@@ -1,11 +1,8 @@
-PRODMAZUL · FASE 4 · PARTE 2 · Tablas y reglas de Recepción (base de datos)
+PRODMAZUL · FASE 4 · PARTE 3 · CORRECCIÓN 1 (verificación del entorno)
 
 Contenido
-  supabase/migrations/   1 migración nueva (20261020000004_m01_recepcion.sql)
-  tests/sql/             pruebas automáticas de la Parte 2 y package.json actualizado (corre las Partes 1 y 2)
-  docs/                  prueba_parte2.sql (se ejecuta en tu proyecto) y limpiar_recepcion.sql
-  respaldo-diario.ps1    script de copia de seguridad actualizado (incluye el esquema m01_recepcion)
+  apps/web/scripts/verificar-entorno.mjs   verificación automática (silenciosa si todo está bien)
+  apps/web/package.json                    agrega la verificación antes de dev, build y test
 
-Se copia ENCIMA de la carpeta del repositorio, junto con lo de la Parte 1.
-Todo se explica paso a paso en la guía: Fase4_Parte2_Guia.html
+Se copia ENCIMA de la carpeta del repositorio. No cambia package-lock.json ni el código de la aplicación.
 No incluye contraseñas, claves ni tokens.
