@@ -1,10 +1,10 @@
-PRODMAZUL · FASE 4 · PARTE 4 · Guardar y consultar recepciones (base de datos)
+PRODMAZUL · FASE 4 · PARTE 5 · Anular, eliminar y reactivar recepciones (base de datos)
 
 Contenido
-  supabase/migrations/   1 migración nueva (20261020000005_api_recepciones.sql) con 5 funciones api_
-  tests/sql/             parte4.mjs (91 pruebas automáticas) y package.json actualizado (corre las Partes 1, 2 y 4)
-  docs/                  prueba_parte4.sql (se ejecuta en Supabase), prueba_api_parte4.ps1 (se ejecuta en PowerShell)
+  supabase/migrations/   1 migración nueva (20261020000006_api_estados.sql) con 3 funciones api_
+  tests/sql/             parte5.mjs (52 pruebas automáticas) y package.json actualizado (corre las Partes 1, 2, 4 y 5)
+  docs/                  prueba_parte5.sql (se ejecuta en Supabase), prueba_api_parte5.ps1 (se ejecuta en PowerShell)
 
-Se copia ENCIMA de la carpeta del repositorio, junto con lo de las Partes 1 y 2.
-Todo se explica paso a paso en la guía: Fase4_Parte4_Guia.html
+Se copia ENCIMA de la carpeta del repositorio, junto con lo de las Partes anteriores.
+Todo se explica paso a paso en la guía: Fase4_Parte5_Guia.html
 No incluye contraseñas, claves ni tokens: el script de PowerShell las pide al ejecutarse.
