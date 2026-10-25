@@ -182,3 +182,33 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .opcion-radio input { width: 1.4rem; height: 1.4rem; margin-top: .1rem; }
 .leyenda-cantidad { margin: .25rem 0 0; font-weight: 700; color: var(--azul-oscuro, #0b2a5b); }
 .grupo-lote .interruptor { margin: .25rem 0 .5rem; }
+
+/* ===== Parte 8: listado, detalle y edición ===== */
+.encabezado-lista { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.encabezado-lista h1 { margin: 0; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.migas { margin: 0 0 .25rem; }
+.filtros-lista { display: flex; gap: .75rem 1rem; flex-wrap: wrap; align-items: flex-end; background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio); padding: .75rem 1rem; margin-bottom: 1rem; }
+.filtros-lista .campo { margin: 0; min-width: 11rem; }
+.filtros-lista .campo-busqueda { flex: 1 1 18rem; }
+.tabla-scroll { overflow-x: auto; background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio); }
+.tabla-lista { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.tabla-lista th, .tabla-lista td { padding: .5rem .45rem; text-align: left; border-bottom: 1px solid var(--linea); white-space: nowrap; }
+.tabla-lista th { background: var(--hielo); color: var(--marino); font-size: .85rem; }
+.tabla-lista .num { text-align: right; }
+.tabla-lista .negativo { color: var(--rojo); font-weight: 600; }
+.tabla-lista tr.fila-anulado td, .tabla-lista tr.fila-eliminado td { color: var(--suave); }
+.tabla-lista td a { font-weight: 600; }
+.tabla-scroll-chica { max-width: 22rem; }
+.tabla-lista td.celda-ancha { white-space: normal; min-width: 11rem; line-height: 1.25; }
+.insignia-estado { display: inline-block; padding: .1rem .6rem; border-radius: 999px; font-size: .85rem; font-weight: 600; border: 1px solid; }
+.estado-borrador { background: var(--ambar-fondo); border-color: #F0D58A; color: var(--ambar); }
+.estado-cerrado { background: var(--verde-fondo); border-color: #9AD7B8; color: #135C3A; }
+.estado-anulado { background: var(--rojo-fondo); border-color: #F2A9B0; color: #7C0D16; }
+.estado-eliminado { background: #eceff3; border-color: #b9c0cc; color: #3d4654; }
+.paginacion { display: flex; gap: 1rem; align-items: center; justify-content: center; margin: 1rem 0; }
+.datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .75rem 1.25rem; margin: 0; }
+.dato dt { font-size: .85rem; color: var(--suave); }
+.dato dd { margin: 0; font-weight: 600; color: var(--marino); overflow-wrap: anywhere; }
+.lista-simple { margin: 0; padding-left: 1.2rem; }
+.acciones-detalle { margin-top: 0; }
+.modal textarea { width: 100%; }

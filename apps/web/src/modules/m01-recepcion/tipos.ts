@@ -72,3 +72,38 @@ export interface ConfigPublica { factor_lb_kg?: number; formato_lote?: string; m
 
 export const FORMATO_LOTE_POR_DEFECTO =
   '^([A-Z]?[0-9]{3}|[0-9]{3}[A-Z]?)(-([A-Z]?[0-9]{3}|[0-9]{3}[A-Z]?)){2}$';
+
+export type EstadoRecepcion = 'borrador' | 'cerrado' | 'anulado' | 'eliminado';
+
+/** Una fila del listado (api_m01_listar_recepciones). */
+export interface ItemListado {
+  recepcion_id: string; fecha_llegada: string; lote_id: string; proveedor_nombre: string; especie_nombre: string;
+  guia_remision: string; placa_vehiculo: string | null; num_gavetas_bines: number; llegada_en: 'bines' | 'gavetas';
+  libras_reportadas: number | null; libras_planta: number | null; diferencia_lb: number | null; diferencia_pct: number | null;
+  estado: EstadoRecepcion; version: number; realizado_por_nombre: string | null; modificado_en: string;
+  creado_por: string | null; lote_cerrado: boolean | null; motivo_anulacion: string | null;
+}
+export interface RespuestaListado { total: number; items: ItemListado[] }
+
+export interface FiltrosListado {
+  busqueda: string; estado: 'activos' | 'todos' | 'borrador' | 'cerrado' | 'anulado' | 'eliminado'; desde: string; hasta: string;
+  limite: number; desplazamiento: number;
+}
+
+/** Recepción completa (api_m01_obtener_recepcion). */
+export interface RecepcionDetalle {
+  recepcion_id: string; version: number; estado: EstadoRecepcion; estado_previo: EstadoRecepcion | null;
+  fecha_llegada: string; placa_vehiculo: string | null; lote_id: string; piscina: string | null; guia_remision: string;
+  llegada_en: 'bines' | 'gavetas'; num_gavetas_bines: number; libras_reportadas: number | null; libras_planta: number | null;
+  diferencia_lb: number | null; diferencia_pct: number | null; peso_promedio_gaveta?: number | null;
+  hora_inicio_descarga: string | null; hora_fin_descarga: string | null; observacion: string | null;
+  proveedor_nombre: string; especie_nombre: string; realizado_por_nombre: string | null; lote_cerrado: boolean | null;
+  creado_por: string | null; creado_en?: string; modificado_en: string;
+  motivo_anulacion: string | null; anulado_en: string | null; eliminado_en: string | null;
+  gavetas: { num_gaveta: number; peso_lb: number }[];
+  temperaturas: { lectura_id: number; num_gaveta: number | null; temperatura_c: number }[];
+  almacenamiento: { num_bin: string; sellos_recepcion: string | null; sellos_almacenamiento: string | null; temperatura_c: number | null; libras_aprox: number | null }[];
+  fotos: { foto_id: string; nn: number; nombre: string }[];
+}
+
+export interface RespuestaEstado { recepcion_id: string; estado: EstadoRecepcion; version: number }

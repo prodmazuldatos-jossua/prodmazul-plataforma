@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useBlocker } from 'react-router-dom';
+import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Alerta, Modal } from '../../core/ui';
 import { PesoInput } from '../../lib/unidades';
@@ -15,8 +15,9 @@ import SeccionTemperaturas from './SeccionTemperaturas';
 import SeccionAlmacenamiento from './SeccionAlmacenamiento';
 import PanelCalculos from './PanelCalculos';
 import { guardarRecepcion, obtenerConfig } from './api';
+import { recepcionAForm } from './mapeo';
 import { aPayload, erroresPorSeccion, validarRecepcion } from './esquema';
-import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type InfoLote, type RespuestaGuardar } from './tipos';
+import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type InfoLote, type RecepcionDetalle, type RespuestaGuardar } from './tipos';
 
 const ORDEN_CAMPOS: CampoForm[] = [
   'fecha_llegada', 'placa_vehiculo', 'lote_id', 'proveedor', 'especie', 'piscina', 'guia_remision', 'num_gavetas_bines',
@@ -31,15 +32,28 @@ const vacio = (): FormRecepcion => ({
 
 type Mensaje = { tipo: 'exito' | 'error' | 'aviso'; texto: string } | null;
 
+interface Props {
+  /** Si se indica, el formulario edita esa recepción (borrador o cerrada) en lugar de crear una nueva. */
+  inicial?: RecepcionDetalle;
+  /** Vuelve a pedir la recepción a la base de datos (cuando otra persona la modificó). */
+  onRecargar?: () => void;
+}
+
 /** Formulario de recepción completo: datos generales, gavetas, temperaturas, almacenamiento y cierre. */
-export default function FormularioRecepcion() {
+export default function FormularioRecepcion({ inicial, onRecargar }: Props = {}) {
   const { perfil } = useAuth();
-  const [f, setF] = useState<FormRecepcion>(vacio);
+  const navigate = useNavigate();
+  const editando = Boolean(inicial);
+  const [f, setF] = useState<FormRecepcion>(() => (inicial ? recepcionAForm(inicial) : vacio()));
   const [errores, setErrores] = useState<Errores>({});
   const [mensaje, setMensaje] = useState<Mensaje>(null);
   const [guardando, setGuardando] = useState(false);
   const [sucio, setSucio] = useState(false);
-  const [meta, setMeta] = useState<{ id: string; version: number } | null>(null);
+  const [meta, setMeta] = useState<{ id: string; version: number } | null>(inicial ? { id: inicial.recepcion_id, version: inicial.version } : null);
+  const [conflicto, setConflicto] = useState(false);
+  /** Lote en el que ya está guardada la recepción: ahí sigue permitido aunque el lote se haya cerrado. */
+  const loteGuardado = useRef<string | null>(inicial ? inicial.lote_id : null);
+  const salidaLibre = useRef(false);
   const [cerrada, setCerrada] = useState<RespuestaGuardar | null>(null);
   const [infoLote, setInfoLote] = useState<InfoLote | null>(null);
   const [formatoLote, setFormatoLote] = useState(FORMATO_LOTE_POR_DEFECTO);
@@ -60,7 +74,7 @@ export default function FormularioRecepcion() {
     window.addEventListener('beforeunload', antes);
     return () => window.removeEventListener('beforeunload', antes);
   }, [sucio]);
-  const bloqueo = useBlocker(({ currentLocation, nextLocation }) => sucio && currentLocation.pathname !== nextLocation.pathname);
+  const bloqueo = useBlocker(({ currentLocation, nextLocation }) => sucio && !salidaLibre.current && currentLocation.pathname !== nextLocation.pathname);
 
   const cambiar = useCallback(<K extends keyof FormRecepcion>(campo: K, valor: FormRecepcion[K]) => {
     setF((p) => ({ ...p, [campo]: valor }));
@@ -99,7 +113,7 @@ export default function FormularioRecepcion() {
 
   const guardar = async (estado: 'borrador' | 'cerrado') => {
     const loteExiste = infoLote ? infoLote.existe : null;
-    const errs = validarRecepcion(f, { formatoLote, hoy: hoyEcuador(), cerrando: estado === 'cerrado', loteExiste, loteCerrado: infoLote?.cerrado === true && !meta });
+    const errs = validarRecepcion(f, { formatoLote, hoy: hoyEcuador(), cerrando: estado === 'cerrado', loteExiste, loteCerrado: infoLote?.cerrado === true && loteGuardado.current !== f.lote_id.trim().toUpperCase() });
     const hayErrores = ORDEN_CAMPOS.some((c) => errs[c]) || Boolean(errs.gavetas) || Boolean(errs.filas);
     if (hayErrores) {
       setErrores(errs);
@@ -115,6 +129,7 @@ export default function FormularioRecepcion() {
     }
     setErrores({});
     setMensaje(null);
+    setConflicto(false);
     setGuardando(true);
     try {
       const r = await guardarRecepcion(aPayload(f, {
@@ -122,8 +137,12 @@ export default function FormularioRecepcion() {
         recepcion_id: meta?.id, version: meta?.version,
       }));
       setMeta({ id: r.recepcion_id, version: r.version });
+      loteGuardado.current = f.lote_id.trim().toUpperCase();
       setSucio(false);
-      if (estado === 'cerrado') setCerrada(r);
+      if (editando && (estado === 'cerrado' || inicial?.estado === 'cerrado')) {
+        salidaLibre.current = true;
+        navigate(`/m01/${r.recepcion_id}`, { state: { aviso: r.lote_cerrado ? 'Cambios guardados. El lote quedó cerrado.' : 'Cambios guardados.' } });
+      } else if (estado === 'cerrado') setCerrada(r);
       else setMensaje({ tipo: 'exito', texto: `Borrador guardado como ${r.recepcion_id}. Puedes seguir completando y volver a guardar.` });
     } catch (e) {
       const err = aApiError(e);
@@ -131,6 +150,9 @@ export default function FormularioRecepcion() {
         setErrores({ guia_remision: err.message });
         setMensaje({ tipo: 'error', texto: err.message });
         document.getElementById('guia_remision')?.focus();
+      } else if (err.codigo === 'E_VERSION') {
+        setConflicto(true);
+        setMensaje({ tipo: 'error', texto: err.message });
       } else if (err.codigo === 'E_RED') {
         setMensaje({ tipo: 'error', texto: 'Sin conexión: no se guardó. Tus datos siguen en la pantalla; intenta de nuevo cuando tengas señal.' });
       } else {
@@ -166,13 +188,20 @@ export default function FormularioRecepcion() {
   const heredado = infoLote?.existe === true;
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate aria-label="Formulario de recepción">
-      <h1>Nueva recepción</h1>
+      <h1>{editando ? `Editar recepción ${inicial?.recepcion_id}` : 'Nueva recepción'}</h1>
       <p className="texto-suave">
         Control de pesos en recepción pesca crustáceos.
-        {meta && <> Guardada como borrador: <strong>{meta.id}</strong>.</>}
+        {meta && !editando && <> Guardada como borrador: <strong>{meta.id}</strong>.</>}
+        {editando && <> Estado actual: <strong>{inicial?.estado === 'cerrado' ? 'cerrada' : 'borrador'}</strong>.</>}
       </p>
       <NavSecciones errores={erroresPorSeccion(errores)} />
       {mensaje && <Alerta tipo={mensaje.tipo}>{mensaje.texto}</Alerta>}
+      {conflicto && onRecargar && (
+        <div className="acciones-fila" data-testid="conflicto">
+          <button type="button" className="boton-primario" onClick={onRecargar}>Volver a cargar la recepción</button>
+          <p className="ayuda">Se descartan tus cambios sin guardar y se muestra la versión más reciente.</p>
+        </div>
+      )}
       {errores.general && <Alerta tipo="aviso">{errores.general}</Alerta>}
 
       <section className="tarjeta tarjeta-ancha" id="seccion-datos" aria-labelledby="sec1">
@@ -233,24 +262,32 @@ export default function FormularioRecepcion() {
           </Campo>
           <div className="campo grupo-lote" data-testid="grupo-cerrar-lote">
             <p className="etiqueta-falsa" id="cerrar_lote-etiqueta">¿Llegan más camiones con este lote?</p>
-            <Conmutador idBase="lote" ariaLabel="Estado del lote al guardar" valor={f.cerrar_lote ? 'cerrado' : 'abierto'}
-                        opciones={[{ valor: 'abierto', texto: 'Lote abierto' }, { valor: 'cerrado', texto: 'Cerrar lote' }]}
-                        onChange={(v) => cambiar('cerrar_lote', v === 'cerrado')} />
-            <p className="ayuda">Un lote cerrado ya no admite recepciones nuevas (un administrador puede reabrirlo). Un borrador nunca cierra el lote.</p>
+            {infoLote?.cerrado === true ? (
+              <p className="ayuda" data-testid="lote-ya-cerrado">El lote <strong>{f.lote_id.trim().toUpperCase()}</strong> ya está <strong>cerrado</strong>. Un administrador puede reabrirlo.</p>
+            ) : (
+              <>
+                <Conmutador idBase="lote" ariaLabel="Estado del lote al guardar" valor={f.cerrar_lote ? 'cerrado' : 'abierto'}
+                            opciones={[{ valor: 'abierto', texto: 'Lote abierto' }, { valor: 'cerrado', texto: 'Cerrar lote' }]}
+                            onChange={(v) => cambiar('cerrar_lote', v === 'cerrado')} />
+                <p className="ayuda">Un lote cerrado ya no admite recepciones nuevas (un administrador puede reabrirlo). Un borrador nunca cierra el lote.</p>
+              </>
+            )}
           </div>
           <Campo id="realizado_por" etiqueta="Realizado por">
-            <input id="realizado_por" type="text" readOnly value={perfil?.nombre?.trim() || perfil?.correo || ''} />
+            <input id="realizado_por" type="text" readOnly value={(editando ? inicial?.realizado_por_nombre?.trim() : perfil?.nombre?.trim()) || perfil?.correo || ''} />
           </Campo>
         </div>
       </section>
 
       <div className="barra-acciones">
-        <Link className="boton-secundario enlace-boton" to="/m01">Salir</Link>
-        <button type="button" className="boton-secundario" disabled={guardando} onClick={() => void guardar('borrador')}>
-          {guardando ? 'Guardando…' : 'Guardar borrador'}
-        </button>
+        <Link className="boton-secundario enlace-boton" to={editando ? `/m01/${inicial?.recepcion_id}` : '/m01'}>{editando ? 'Cancelar' : 'Salir'}</Link>
+        {inicial?.estado !== 'cerrado' && (
+          <button type="button" className="boton-secundario" disabled={guardando} onClick={() => void guardar('borrador')}>
+            {guardando ? 'Guardando…' : 'Guardar borrador'}
+          </button>
+        )}
         <button type="button" className="boton-primario" disabled={guardando} onClick={() => void guardar('cerrado')}>
-          Guardar y cerrar
+          {inicial?.estado === 'cerrado' ? (guardando ? 'Guardando…' : 'Guardar cambios') : 'Guardar y cerrar'}
         </button>
       </div>
 
