@@ -107,3 +107,22 @@ export interface RecepcionDetalle {
 }
 
 export interface RespuestaEstado { recepcion_id: string; estado: EstadoRecepcion; version: number }
+
+/** Una foto ya guardada de una recepción (api_m01_fotos_recepcion). */
+export interface FotoRemota {
+  foto_id: string; nn: number; nombre: string; tipo_mime: string; tamano_bytes: number; ruta: string; subido_en: string;
+}
+
+/** Una foto elegida en el formulario que todavía no se sube (se sube al guardar la recepción). */
+export interface FotoNueva {
+  id: string;
+  nombre: string;
+  tipo: string;
+  blob?: Blob;
+  tamano: number;
+  previewUrl: string;
+  estado: 'comprimiendo' | 'lista' | 'subiendo' | 'error';
+  error?: string;
+}
+
+export interface RespuestaRegistroFoto { foto_id: string; nn: number; ruta: string }

@@ -8,6 +8,7 @@ import { textoCantidad } from '../../lib/texto';
 import { useUnidad } from '../../lib/unidades';
 import { anularRecepcion, eliminarRecepcion, obtenerRecepcion, reactivarRecepcion } from './api';
 import { pesoPromedio, redondear } from './calculos';
+import GaleriaFotos from './GaleriaFotos';
 import InsigniaEstado from './InsigniaEstado';
 import { capacidades } from './mapeo';
 import type { RecepcionDetalle } from './tipos';
@@ -195,9 +196,14 @@ export default function DetalleRecepcion() {
       </section>
 
       <section className="tarjeta tarjeta-ancha" aria-labelledby="d5">
-        <h2 id="d5">Observación y fotos</h2>
+        <h2 id="d5">Observación</h2>
         <p data-testid="d-observacion">{r.observacion ?? <span className="texto-suave">Sin observación.</span>}</p>
-        <p className="texto-suave">Fotos: {r.fotos.length}. {r.fotos.length > 0 ? 'La galería llega en la Parte 9.' : ''}</p>
+      </section>
+
+      <section className="tarjeta tarjeta-ancha" aria-labelledby="d6">
+        <h2 id="d6">Fotos</h2>
+        <GaleriaFotos recepcionId={r.recepcion_id} puedeBorrar={cap.editar && puede('M01', 'cargar_imagenes')} refrescar={r.version} />
+        {cap.editar && puede('M01', 'cargar_imagenes') && <p className="ayuda">Para agregar fotos usa <strong>Editar</strong>.</p>}
       </section>
 
       {accion && (

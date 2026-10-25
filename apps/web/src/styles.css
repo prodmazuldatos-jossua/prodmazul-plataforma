@@ -212,3 +212,15 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .lista-simple { margin: 0; padding-left: 1.2rem; }
 .acciones-detalle { margin-top: 0; }
 .modal textarea { width: 100%; }
+
+/* ===== Parte 9: fotos ===== */
+.grupo-fotos { width: 100%; }
+.fotos-rejilla { list-style: none; margin: .5rem 0 1rem; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: .75rem; }
+.foto-item { display: flex; flex-direction: column; gap: .35rem; align-items: stretch; }
+.foto-miniatura { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 4 / 3; padding: 0; background: var(--hielo); border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; cursor: pointer; }
+div.foto-miniatura { cursor: default; }
+.foto-miniatura img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto-pie { margin: 0; font-size: .85rem; color: var(--suave); }
+.foto-error .foto-miniatura { border-color: var(--rojo); }
+.foto-subiendo { opacity: .7; }
+.foto-grande { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto .5rem; border-radius: var(--radio); }

@@ -1,6 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { aApiError } from '../../lib/errores';
-import type { ConfigPublica, FiltrosListado, InfoLote, ItemCatalogo, RecepcionDetalle, RespuestaEstado, RespuestaGuardar, RespuestaListado } from './tipos';
+import type { ConfigPublica, FiltrosListado, FotoRemota, InfoLote, ItemCatalogo, RecepcionDetalle, RespuestaEstado, RespuestaGuardar, RespuestaListado, RespuestaRegistroFoto } from './tipos';
 
 async function llamar<T>(funcion: string, args?: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(funcion, args);
@@ -33,3 +33,9 @@ export const eliminarRecepcion = (id: string, motivo: string, version: number) =
   llamar<RespuestaEstado>('api_m01_eliminar', { p_id: id, p_motivo: motivo, p_version: version });
 export const reactivarRecepcion = (id: string, version: number) =>
   llamar<RespuestaEstado>('api_m01_reactivar', { p_id: id, p_version: version });
+
+export const registrarFoto = (recepcionId: string, nombre: string, tipo: string, tamano: number) =>
+  llamar<RespuestaRegistroFoto>('api_m01_registrar_foto', { p_recepcion_id: recepcionId, p_nombre: nombre, p_tipo_mime: tipo, p_tamano: tamano });
+export const confirmarFoto = (fotoId: string) => llamar<{ foto_id: string; confirmada: boolean }>('api_m01_confirmar_foto', { p_foto_id: fotoId });
+export const eliminarFotoDb = (fotoId: string) => llamar<{ eliminada: boolean }>('api_m01_eliminar_foto', { p_foto_id: fotoId });
+export const fotosDeRecepcion = (recepcionId: string) => llamar<FotoRemota[]>('api_m01_fotos_recepcion', { p_recepcion_id: recepcionId });

@@ -3,7 +3,7 @@ import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Alerta, Modal } from '../../core/ui';
 import { PesoInput } from '../../lib/unidades';
-import { aApiError } from '../../lib/errores';
+import { aApiError, mensajeDe } from '../../lib/errores';
 import { hoyEcuador } from '../../lib/fechas';
 import { Campo, CampoTexto, Conmutador } from './controles';
 import { textoCantidad } from '../../lib/texto';
@@ -15,9 +15,11 @@ import SeccionTemperaturas from './SeccionTemperaturas';
 import SeccionAlmacenamiento from './SeccionAlmacenamiento';
 import PanelCalculos from './PanelCalculos';
 import { guardarRecepcion, obtenerConfig } from './api';
+import FotosEditor from './FotosEditor';
+import { subirFoto } from './fotos';
 import { recepcionAForm } from './mapeo';
 import { aPayload, erroresPorSeccion, validarRecepcion } from './esquema';
-import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type InfoLote, type RecepcionDetalle, type RespuestaGuardar } from './tipos';
+import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type FotoNueva, type InfoLote, type RecepcionDetalle, type RespuestaGuardar } from './tipos';
 
 const ORDEN_CAMPOS: CampoForm[] = [
   'fecha_llegada', 'placa_vehiculo', 'lote_id', 'proveedor', 'especie', 'piscina', 'guia_remision', 'num_gavetas_bines',
@@ -41,7 +43,7 @@ interface Props {
 
 /** Formulario de recepción completo: datos generales, gavetas, temperaturas, almacenamiento y cierre. */
 export default function FormularioRecepcion({ inicial, onRecargar }: Props = {}) {
-  const { perfil } = useAuth();
+  const { perfil, puede } = useAuth();
   const navigate = useNavigate();
   const editando = Boolean(inicial);
   const [f, setF] = useState<FormRecepcion>(() => (inicial ? recepcionAForm(inicial) : vacio()));
@@ -57,24 +59,33 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
   const [cerrada, setCerrada] = useState<RespuestaGuardar | null>(null);
   const [infoLote, setInfoLote] = useState<InfoLote | null>(null);
   const [formatoLote, setFormatoLote] = useState(FORMATO_LOTE_POR_DEFECTO);
+  const [fotosNuevas, setFotosNuevas] = useState<FotoNueva[]>([]);
+  const fotosRef = useRef<FotoNueva[]>([]);
+  fotosRef.current = fotosNuevas;
+  const [refrescoFotos, setRefrescoFotos] = useState(0);
+  const [maxFotos, setMaxFotos] = useState(5);
+  /** La recepción ya se guardó pero alguna foto no se pudo subir: se ofrece reintentar o terminar sin ellas. */
+  const [pendienteFin, setPendienteFin] = useState<{ r: RespuestaGuardar; estado: 'borrador' | 'cerrado' } | null>(null);
   const clientUuid = useRef<string>(crypto.randomUUID());
   const proveedorHeredado = useRef(false);
 
   // Formato del lote desde la configuración de la base de datos (si no hay red, se usa el de fábrica).
   useEffect(() => {
     let vivo = true;
-    obtenerConfig().then((c) => { if (vivo && c.formato_lote) setFormatoLote(c.formato_lote); }).catch(() => { /* se usa el de fábrica */ });
+    obtenerConfig().then((c) => { if (!vivo) return; if (c.formato_lote) setFormatoLote(c.formato_lote); if (c.max_fotos_recepcion) setMaxFotos(c.max_fotos_recepcion); }).catch(() => { /* se usa el de fábrica */ });
     return () => { vivo = false; };
   }, []);
 
   // Aviso al salir con cambios sin guardar (cierre de pestaña y navegación interna).
+  const sinGuardar = sucio || fotosNuevas.length > 0;
   useEffect(() => {
-    if (!sucio) return;
+    if (!sinGuardar) return;
     const antes = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', antes);
     return () => window.removeEventListener('beforeunload', antes);
-  }, [sucio]);
-  const bloqueo = useBlocker(({ currentLocation, nextLocation }) => sucio && !salidaLibre.current && currentLocation.pathname !== nextLocation.pathname);
+  }, [sinGuardar]);
+  useEffect(() => () => { fotosRef.current.forEach((x) => { if (x.previewUrl) URL.revokeObjectURL(x.previewUrl); }); }, []);
+  const bloqueo = useBlocker(({ currentLocation, nextLocation }) => sinGuardar && !salidaLibre.current && currentLocation.pathname !== nextLocation.pathname);
 
   const cambiar = useCallback(<K extends keyof FormRecepcion>(campo: K, valor: FormRecepcion[K]) => {
     setF((p) => ({ ...p, [campo]: valor }));
@@ -111,7 +122,57 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
     setErrores((e) => (e.filas ? { ...e, filas: { ...e.filas, almacenamiento: {} } } : e));
   }, []);
 
+  /** Sube las fotos que esperan (las nuevas y las que fallaron antes). Devuelve cuántas no se pudieron subir. */
+  const subirPendientes = async (recepcionId: string): Promise<number> => {
+    const ids = fotosRef.current.filter((x) => x.estado === 'lista' || x.estado === 'error').map((x) => x.id);
+    let fallidas = 0;
+    for (const id of ids) {
+      const foto = fotosRef.current.find((x) => x.id === id);
+      if (!foto?.blob) continue;
+      setFotosNuevas((p) => p.map((x) => (x.id === id ? { ...x, estado: 'subiendo', error: undefined } : x)));
+      try {
+        await subirFoto(recepcionId, { blob: foto.blob, nombre: foto.nombre, tipo: foto.tipo });
+        if (foto.previewUrl) URL.revokeObjectURL(foto.previewUrl);
+        setFotosNuevas((p) => p.filter((x) => x.id !== id));
+      } catch (e) {
+        fallidas++;
+        setFotosNuevas((p) => p.map((x) => (x.id === id ? { ...x, estado: 'error', error: mensajeDe(e) } : x)));
+      }
+    }
+    setRefrescoFotos((n) => n + 1);
+    return fallidas;
+  };
+
+  /** Lo que sigue cuando la recepción y sus fotos quedaron resueltas. */
+  const continuar = (r: RespuestaGuardar, estado: 'borrador' | 'cerrado') => {
+    setPendienteFin(null);
+    if (editando && (estado === 'cerrado' || inicial?.estado === 'cerrado')) {
+      salidaLibre.current = true;
+      navigate(`/m01/${r.recepcion_id}`, { state: { aviso: r.lote_cerrado ? 'Cambios guardados. El lote quedó cerrado.' : 'Cambios guardados.' } });
+    } else if (estado === 'cerrado') setCerrada(r);
+    else setMensaje({ tipo: 'exito', texto: `Borrador guardado como ${r.recepcion_id}. Puedes seguir completando y volver a guardar.` });
+  };
+
+  const reintentarFotos = async () => {
+    if (!pendienteFin) return;
+    setGuardando(true); setMensaje(null);
+    const fallidas = await subirPendientes(pendienteFin.r.recepcion_id);
+    setGuardando(false);
+    if (fallidas === 0) continuar(pendienteFin.r, pendienteFin.estado);
+    else setMensaje({ tipo: 'error', texto: `Todavía hay ${fallidas} foto${fallidas === 1 ? '' : 's'} sin subir. Revisa tu conexión e intenta de nuevo.` });
+  };
+
+  const terminarSinFotos = () => {
+    fotosRef.current.forEach((x) => { if (x.previewUrl) URL.revokeObjectURL(x.previewUrl); });
+    setFotosNuevas([]);
+    if (pendienteFin) continuar(pendienteFin.r, pendienteFin.estado);
+  };
+
   const guardar = async (estado: 'borrador' | 'cerrado') => {
+    if (fotosRef.current.some((x) => x.estado === 'comprimiendo')) {
+      setMensaje({ tipo: 'aviso', texto: 'Espera un momento: las fotos se están preparando.' });
+      return;
+    }
     const loteExiste = infoLote ? infoLote.existe : null;
     const errs = validarRecepcion(f, { formatoLote, hoy: hoyEcuador(), cerrando: estado === 'cerrado', loteExiste, loteCerrado: infoLote?.cerrado === true && loteGuardado.current !== f.lote_id.trim().toUpperCase() });
     const hayErrores = ORDEN_CAMPOS.some((c) => errs[c]) || Boolean(errs.gavetas) || Boolean(errs.filas);
@@ -139,11 +200,16 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
       setMeta({ id: r.recepcion_id, version: r.version });
       loteGuardado.current = f.lote_id.trim().toUpperCase();
       setSucio(false);
-      if (editando && (estado === 'cerrado' || inicial?.estado === 'cerrado')) {
-        salidaLibre.current = true;
-        navigate(`/m01/${r.recepcion_id}`, { state: { aviso: r.lote_cerrado ? 'Cambios guardados. El lote quedó cerrado.' : 'Cambios guardados.' } });
-      } else if (estado === 'cerrado') setCerrada(r);
-      else setMensaje({ tipo: 'exito', texto: `Borrador guardado como ${r.recepcion_id}. Puedes seguir completando y volver a guardar.` });
+      if (fotosRef.current.some((x) => x.estado === 'lista' || x.estado === 'error')) {
+        const fallidas = await subirPendientes(r.recepcion_id);
+        if (fallidas > 0) {
+          // La recepción NO se pierde: ya está guardada. Solo quedan fotos por resolver.
+          setPendienteFin({ r, estado });
+          setMensaje({ tipo: 'error', texto: `La recepción ${r.recepcion_id} quedó guardada, pero ${fallidas} foto${fallidas === 1 ? '' : 's'} no se pudo subir. Reintenta o termina sin ${fallidas === 1 ? 'ella' : 'ellas'}.` });
+          return;
+        }
+      }
+      continuar(r, estado);
     } catch (e) {
       const err = aApiError(e);
       if (err.codigo === 'E_DUPLICADO') {
@@ -166,6 +232,8 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
   const reiniciar = () => {
     clientUuid.current = crypto.randomUUID();
     proveedorHeredado.current = false;
+    fotosRef.current.forEach((x) => { if (x.previewUrl) URL.revokeObjectURL(x.previewUrl); });
+    setFotosNuevas([]); setPendienteFin(null); setRefrescoFotos(0);
     setF(vacio()); setErrores({}); setMensaje(null); setSucio(false); setMeta(null); setCerrada(null); setInfoLote(null);
   };
 
@@ -276,9 +344,21 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
           <Campo id="realizado_por" etiqueta="Realizado por">
             <input id="realizado_por" type="text" readOnly value={(editando ? inicial?.realizado_por_nombre?.trim() : perfil?.nombre?.trim()) || perfil?.correo || ''} />
           </Campo>
+          <div className="campo grupo-lote" id="seccion-fotos">
+            <FotosEditor recepcionId={meta?.id} pendientes={fotosNuevas} setPendientes={setFotosNuevas} max={maxFotos}
+                         refrescar={refrescoFotos} puedeAgregar={puede('M01', 'cargar_imagenes') && !pendienteFin} />
+          </div>
         </div>
       </section>
 
+      {pendienteFin ? (
+        <div className="barra-acciones" data-testid="barra-fotos-fallidas">
+          <button type="button" className="boton-secundario" disabled={guardando} onClick={terminarSinFotos}>Terminar sin esas fotos</button>
+          <button type="button" className="boton-primario" disabled={guardando} onClick={() => void reintentarFotos()}>
+            {guardando ? 'Subiendo…' : 'Reintentar subir las fotos'}
+          </button>
+        </div>
+      ) : (
       <div className="barra-acciones">
         <Link className="boton-secundario enlace-boton" to={editando ? `/m01/${inicial?.recepcion_id}` : '/m01'}>{editando ? 'Cancelar' : 'Salir'}</Link>
         {inicial?.estado !== 'cerrado' && (
@@ -290,6 +370,7 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
           {inicial?.estado === 'cerrado' ? (guardando ? 'Guardando…' : 'Guardar cambios') : 'Guardar y cerrar'}
         </button>
       </div>
+      )}
 
       {bloqueo.state === 'blocked' && (
         <Modal titulo="Tienes cambios sin guardar" onCerrar={() => bloqueo.reset()}

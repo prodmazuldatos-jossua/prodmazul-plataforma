@@ -1,9 +1,10 @@
-Prodmazul - Fase 4 - Parte 8: Listado, detalle, edicion y cambios de estado de las recepciones.
+Prodmazul - Fase 4 - Parte 9: Fotos de la recepcion.
 
 Contenido:
-  supabase/migrations/    Migracion 10 (el listado devuelve mas datos).
-  apps/web/src/...        Listado con filtros y paginas, detalle, edicion, anular / eliminar / reactivar, estilos y pruebas.
-  tests/sql/              parte8.mjs (57 pruebas) y package.json (partes 1, 2, 4, 5, 6, 7 y 8).
-  docs/                   prueba_parte8.sql (prueba dentro de tu proyecto de Supabase).
+  supabase/migrations/    Migracion 11 (deposito privado de fotos, reglas de acceso y 4 funciones api_m01_*_foto).
+  apps/web/src/...        Tomar foto / elegir de la galeria, compresion en el dispositivo, subida al guardar,
+                          galeria con enlaces temporales, quitar fotos, estilos y pruebas.
+  tests/sql/              parte9.mjs (57 pruebas) y package.json (partes 1, 2, 4, 5, 6, 7, 8 y 9).
+  docs/                   prueba_parte9.sql (prueba dentro de tu proyecto de Supabase).
 
-Copiar sobre el repositorio con Copy-Item ... -Recurse -Force (ver la guia, paso 2) y luego aplicar la migracion 10.
+Copiar sobre el repositorio con Copy-Item ... -Recurse -Force (ver la guia, paso 2) y luego aplicar la migracion 11.
