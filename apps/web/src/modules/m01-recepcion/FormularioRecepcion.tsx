@@ -17,6 +17,9 @@ import PanelCalculos from './PanelCalculos';
 import { guardarRecepcion, obtenerConfig } from './api';
 import FotosEditor from './FotosEditor';
 import { subirFoto } from './fotos';
+import { cola, protegerAlmacenamiento } from '../../offline/pendientes';
+import type { FotoPendiente, Pendiente } from '../../offline/db';
+import { useOnline } from '../../lib/conexion';
 import { recepcionAForm } from './mapeo';
 import { aPayload, erroresPorSeccion, validarRecepcion } from './esquema';
 import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type FotoNueva, type InfoLote, type RecepcionDetalle, type RespuestaGuardar } from './tipos';
@@ -39,18 +42,22 @@ interface Props {
   inicial?: RecepcionDetalle;
   /** Vuelve a pedir la recepción a la base de datos (cuando otra persona la modificó). */
   onRecargar?: () => void;
+  /** Si se indica, se corrige una recepción guardada en este dispositivo que el servidor rechazó. */
+  pendiente?: Pendiente;
 }
 
 /** Formulario de recepción completo: datos generales, gavetas, temperaturas, almacenamiento y cierre. */
-export default function FormularioRecepcion({ inicial, onRecargar }: Props = {}) {
+export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: Props = {}) {
   const { perfil, puede } = useAuth();
   const navigate = useNavigate();
   const editando = Boolean(inicial);
-  const [f, setF] = useState<FormRecepcion>(() => (inicial ? recepcionAForm(inicial) : vacio()));
+  const corrigiendo = Boolean(pendiente);
+  const online = useOnline();
+  const [f, setF] = useState<FormRecepcion>(() => (inicial ? recepcionAForm(inicial) : pendiente ? pendiente.form : vacio()));
   const [errores, setErrores] = useState<Errores>({});
   const [mensaje, setMensaje] = useState<Mensaje>(null);
   const [guardando, setGuardando] = useState(false);
-  const [sucio, setSucio] = useState(false);
+  const [sucio, setSucio] = useState(corrigiendo);
   const [meta, setMeta] = useState<{ id: string; version: number } | null>(inicial ? { id: inicial.recepcion_id, version: inicial.version } : null);
   const [conflicto, setConflicto] = useState(false);
   /** Lote en el que ya está guardada la recepción: ahí sigue permitido aunque el lote se haya cerrado. */
@@ -59,14 +66,18 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
   const [cerrada, setCerrada] = useState<RespuestaGuardar | null>(null);
   const [infoLote, setInfoLote] = useState<InfoLote | null>(null);
   const [formatoLote, setFormatoLote] = useState(FORMATO_LOTE_POR_DEFECTO);
-  const [fotosNuevas, setFotosNuevas] = useState<FotoNueva[]>([]);
+  const [fotosNuevas, setFotosNuevas] = useState<FotoNueva[]>(() => (pendiente?.fotos ?? []).map((x) => ({
+    id: x.id, nombre: x.nombre, tipo: x.tipo, blob: x.blob, tamano: x.tamano, previewUrl: URL.createObjectURL(x.blob), estado: 'lista' as const,
+  })));
+  /** La recepción quedó guardada en este dispositivo (sin señal) y espera para enviarse. */
+  const [enCola, setEnCola] = useState<{ guia: string; lote: string; fotos: number } | null>(null);
   const fotosRef = useRef<FotoNueva[]>([]);
   fotosRef.current = fotosNuevas;
   const [refrescoFotos, setRefrescoFotos] = useState(0);
   const [maxFotos, setMaxFotos] = useState(5);
   /** La recepción ya se guardó pero alguna foto no se pudo subir: se ofrece reintentar o terminar sin ellas. */
   const [pendienteFin, setPendienteFin] = useState<{ r: RespuestaGuardar; estado: 'borrador' | 'cerrado' } | null>(null);
-  const clientUuid = useRef<string>(crypto.randomUUID());
+  const clientUuid = useRef<string>(pendiente?.client_uuid ?? crypto.randomUUID());
   const proveedorHeredado = useRef(false);
 
   // Formato del lote desde la configuración de la base de datos (si no hay red, se usa el de fábrica).
@@ -168,6 +179,34 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
     if (pendienteFin) continuar(pendienteFin.r, pendienteFin.estado);
   };
 
+  /** Guarda la recepción en este dispositivo para enviarla cuando haya conexión (solo para recepciones que aún no están en el servidor). */
+  const encolar = async (estado: 'borrador' | 'cerrado', loteExiste: boolean | null): Promise<boolean> => {
+    const uid = perfil?.user_id;
+    if (!uid) { setMensaje({ tipo: 'error', texto: 'Tu sesión no es válida. Vuelve a iniciar sesión.' }); return false; }
+    const fotos: FotoPendiente[] = fotosRef.current.filter((x) => x.blob).map((x) => ({ id: x.id, nombre: x.nombre, tipo: x.tipo, blob: x.blob!, tamano: x.tamano }));
+    const payload = aPayload(f, { client_uuid: clientUuid.current, estado, loteExiste });
+    const resumen = { lote_id: f.lote_id.trim().toUpperCase(), guia_remision: f.guia_remision.trim(), proveedor: f.proveedor.trim(), especie: f.especie.trim(), fecha_llegada: f.fecha_llegada, estado };
+    try {
+      if (pendiente) await cola.corregir(pendiente.client_uuid, { payload, form: f, fotos, resumen });
+      else await cola.encolar({ client_uuid: clientUuid.current, user_id: uid, payload, form: f, fotos, resumen });
+    } catch (e) {
+      setMensaje({ tipo: 'error', texto: `No se pudo guardar en este dispositivo (${(e as Error).message || 'sin espacio o sin permiso'}). Tus datos siguen en la pantalla.` });
+      return false;
+    }
+    void protegerAlmacenamiento();
+    fotosRef.current.forEach((x) => { if (x.previewUrl) URL.revokeObjectURL(x.previewUrl); });
+    setFotosNuevas([]);
+    setSucio(false);
+    if (navigator.onLine) void cola.sincronizar(uid);
+    if (pendiente) {
+      salidaLibre.current = true;
+      navigate('/m01/pendientes', { state: { aviso: 'Corregida. Se enviará en cuanto haya conexión.' } });
+    } else {
+      setEnCola({ guia: resumen.guia_remision, lote: resumen.lote_id, fotos: fotos.length });
+    }
+    return true;
+  };
+
   const guardar = async (estado: 'borrador' | 'cerrado') => {
     if (fotosRef.current.some((x) => x.estado === 'comprimiendo')) {
       setMensaje({ tipo: 'aviso', texto: 'Espera un momento: las fotos se están preparando.' });
@@ -192,6 +231,13 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
     setMensaje(null);
     setConflicto(false);
     setGuardando(true);
+    // Recepción nueva que todavía no está en el servidor: sin señal (o corrigiendo un pendiente) se guarda en este dispositivo.
+    const puedeEncolar = !editando && !meta;
+    if (puedeEncolar && (corrigiendo || !navigator.onLine)) {
+      await encolar(estado, loteExiste);
+      setGuardando(false);
+      return;
+    }
     try {
       const r = await guardarRecepcion(aPayload(f, {
         client_uuid: clientUuid.current, estado, loteExiste,
@@ -220,7 +266,12 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
         setConflicto(true);
         setMensaje({ tipo: 'error', texto: err.message });
       } else if (err.codigo === 'E_RED') {
-        setMensaje({ tipo: 'error', texto: 'Sin conexión: no se guardó. Tus datos siguen en la pantalla; intenta de nuevo cuando tengas señal.' });
+        if (puedeEncolar) {
+          // Pudo haber llegado al servidor sin que lo supiéramos: reenviar con el mismo client_uuid no lo duplica.
+          await encolar(estado, loteExiste);
+        } else {
+          setMensaje({ tipo: 'error', texto: 'Sin conexión: para modificar una recepción que ya está guardada necesitas señal. Tus datos siguen en la pantalla; intenta de nuevo cuando tengas señal.' });
+        }
       } else {
         setMensaje({ tipo: 'error', texto: err.message });
       }
@@ -234,8 +285,26 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
     proveedorHeredado.current = false;
     fotosRef.current.forEach((x) => { if (x.previewUrl) URL.revokeObjectURL(x.previewUrl); });
     setFotosNuevas([]); setPendienteFin(null); setRefrescoFotos(0);
-    setF(vacio()); setErrores({}); setMensaje(null); setSucio(false); setMeta(null); setCerrada(null); setInfoLote(null);
+    setF(vacio()); setErrores({}); setMensaje(null); setSucio(false); setMeta(null); setCerrada(null); setInfoLote(null); setEnCola(null);
   };
+
+  if (enCola) {
+    return (
+      <>
+        <h1>Guardada en este dispositivo</h1>
+        <Alerta tipo="aviso" >
+          La recepción con guía <strong>{enCola.guia}</strong> (lote <strong>{enCola.lote}</strong>) se guardó en <strong>este dispositivo</strong> y todavía <strong>no está en el servidor</strong>.
+          Se enviará sola en cuanto haya conexión{enCola.fotos > 0 ? `, junto con ${enCola.fotos} foto${enCola.fotos === 1 ? '' : 's'}` : ''}.
+        </Alerta>
+        <p className="texto-suave">No borres los datos del navegador ni desinstales la aplicación hasta que se envíe. Puedes seguir registrando otras recepciones; el contador de pendientes está arriba.</p>
+        <div className="acciones-fila">
+          <button className="boton-primario" onClick={reiniciar}>Registrar otra recepción</button>
+          <Link className="boton-secundario enlace-boton" to="/m01/pendientes">Ver pendientes</Link>
+          <Link className="boton-secundario enlace-boton" to="/m01">Volver a Recepción</Link>
+        </div>
+      </>
+    );
+  }
 
   if (cerrada) {
     return (
@@ -256,7 +325,10 @@ export default function FormularioRecepcion({ inicial, onRecargar }: Props = {})
   const heredado = infoLote?.existe === true;
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate aria-label="Formulario de recepción">
-      <h1>{editando ? `Editar recepción ${inicial?.recepcion_id}` : 'Nueva recepción'}</h1>
+      <h1>{editando ? `Editar recepción ${inicial?.recepcion_id}` : corrigiendo ? 'Corregir recepción pendiente' : 'Nueva recepción'}</h1>
+      {pendiente?.ultimo_error && <Alerta tipo="error">El servidor no aceptó esta recepción: {pendiente.ultimo_error} Corrígela y vuelve a guardar.</Alerta>}
+      {!online && !editando && !meta && <Alerta tipo="aviso">Estás sin conexión: al guardar, la recepción quedará en este dispositivo y se enviará sola cuando vuelva la señal.</Alerta>}
+      {!online && (editando || meta) && <Alerta tipo="aviso">Estás sin conexión: para guardar cambios de una recepción que ya está en el servidor necesitas señal.</Alerta>}
       <p className="texto-suave">
         Control de pesos en recepción pesca crustáceos.
         {meta && !editando && <> Guardada como borrador: <strong>{meta.id}</strong>.</>}

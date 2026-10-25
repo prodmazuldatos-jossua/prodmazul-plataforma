@@ -1,10 +1,11 @@
-Prodmazul - Fase 4 - Parte 9: Fotos de la recepcion.
+Prodmazul - Fase 4 - Parte 10: Modo sin conexion.
 
 Contenido:
-  supabase/migrations/    Migracion 11 (deposito privado de fotos, reglas de acceso y 4 funciones api_m01_*_foto).
-  apps/web/src/...        Tomar foto / elegir de la galeria, compresion en el dispositivo, subida al guardar,
-                          galeria con enlaces temporales, quitar fotos, estilos y pruebas.
-  tests/sql/              parte9.mjs (57 pruebas) y package.json (partes 1, 2, 4, 5, 6, 7, 8 y 9).
-  docs/                   prueba_parte9.sql (prueba dentro de tu proyecto de Supabase).
+  apps/web/src/offline/        Cola local de pendientes (IndexedDB), envio automatico, contador y pruebas.
+  apps/web/src/modules/...     Formulario que guarda sin senal, pantallas Pendientes y Corregir, botones sin senal.
+  apps/web/src/core/...        Encabezado con contador de pendientes y aviso al cerrar sesion.
+  apps/web/src/lib/...         Un tiempo de espera agotado se trata como falta de conexion.
+  docs/                        prueba_parte10.sql (prueba dentro de tu proyecto de Supabase).
 
-Copiar sobre el repositorio con Copy-Item ... -Recurse -Force (ver la guia, paso 2) y luego aplicar la migracion 11.
+No hay migracion nueva: la base de datos queda igual (11 migraciones).
+Copiar sobre el repositorio con Copy-Item ... -Recurse -Force (ver la guia, paso 2).

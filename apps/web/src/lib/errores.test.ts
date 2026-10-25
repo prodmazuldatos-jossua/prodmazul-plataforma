@@ -12,6 +12,10 @@ describe('errores', () => {
     expect(esErrorDeRed(new TypeError('Failed to fetch'))).toBe(true);
     expect(aApiError(new TypeError('Failed to fetch')).codigo).toBe('E_RED');
   });
+  it('trata un tiempo de espera agotado como falta de conexión', () => {
+    expect(esErrorDeRed({ message: 'TimeoutError: signal timed out' })).toBe(true);
+    expect(aApiError({ message: 'AbortError: The user aborted a request.' }).codigo).toBe('E_RED');
+  });
   it('traduce problemas de sesión', () => {
     expect(aApiError({ message: 'JWT expired' }).codigo).toBe('E_SESION');
   });

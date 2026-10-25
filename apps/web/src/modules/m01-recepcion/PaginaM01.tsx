@@ -5,6 +5,8 @@ import DetalleRecepcion from './DetalleRecepcion';
 import EdicionRecepcion from './EdicionRecepcion';
 import FormularioRecepcion from './FormularioRecepcion';
 import ListadoRecepciones from './ListadoRecepciones';
+import PaginaPendientes from './PaginaPendientes';
+import CorregirPendiente from './CorregirPendiente';
 
 function SoloCrear({ children }: { children: React.ReactNode }) {
   const { puede } = useAuth();
@@ -27,6 +29,8 @@ export default function PaginaM01() {
     <Routes>
       <Route index element={<SoloVer><ListadoRecepciones /></SoloVer>} />
       <Route path="nueva" element={<SoloCrear><FormularioRecepcion /></SoloCrear>} />
+      <Route path="pendientes" element={<SoloCrear><PaginaPendientes /></SoloCrear>} />
+      <Route path="pendientes/:uuid" element={<SoloCrear><CorregirPendiente /></SoloCrear>} />
       <Route path=":id" element={<SoloVer><DetalleRecepcion /></SoloVer>} />
       <Route path=":id/editar" element={<SoloVer><EdicionRecepcion /></SoloVer>} />
       <Route path="*" element={<SoloVer><ListadoRecepciones /></SoloVer>} />

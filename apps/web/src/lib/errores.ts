@@ -10,7 +10,8 @@ export class ApiError extends Error {
 export function esErrorDeRed(e: unknown): boolean {
   if (e instanceof ApiError) return e.codigo === 'E_RED';
   const m = String((e as { message?: string })?.message ?? e).toLowerCase();
-  return m.includes('failed to fetch') || m.includes('networkerror') || m.includes('load failed') || m.includes('network request failed');
+  return m.includes('failed to fetch') || m.includes('networkerror') || m.includes('load failed') || m.includes('network request failed')
+    || m.includes('aborterror') || m.includes('timeouterror') || m.includes('signal timed out') || m.includes('the user aborted');
 }
 
 /** Convierte cualquier error de Supabase en un ApiError con mensaje en español. */

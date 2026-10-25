@@ -1,3 +1,4 @@
+import type { FotoPendiente } from '../../offline/db';
 import { supabase } from '../../lib/supabase';
 import { ApiError, aApiError, esErrorDeRed } from '../../lib/errores';
 import { confirmarFoto, eliminarFotoDb, registrarFoto } from './api';
@@ -134,6 +135,49 @@ export async function subirFoto(recepcionId: string, f: { blob: Blob; nombre: st
 }
 
 /** Borra una foto guardada: primero el archivo y luego su registro (así se libera el cupo). */
+function archivoYaExiste(e: unknown): boolean {
+  const x = e as { statusCode?: string | number; status?: number; message?: string };
+  return Number(x?.statusCode ?? x?.status ?? 0) === 409 || /already exists|duplicate/i.test(String(x?.message ?? ''));
+}
+
+/**
+ * Sube una foto en tres pasos (registrar, subir el archivo, confirmar) y avisa de cada avance, de modo que si se
+ * corta la señal a la mitad el siguiente intento continúa donde quedó y no sube la foto dos veces.
+ * Con error de red no limpia nada (el registro sigue vivo para reanudar).
+ */
+export async function subirFotoReanudable(recepcionId: string, foto: FotoPendiente, alAvanzar: (f: FotoPendiente) => Promise<void>): Promise<void> {
+  let f = foto;
+  const avanzar = async (cambios: Partial<FotoPendiente>) => { f = { ...f, ...cambios }; await alAvanzar(f); };
+  const pasos = async () => {
+    if (!f.reg) {
+      const reg = await registrarFoto(recepcionId, f.nombre, f.tipo, f.blob.size);
+      await avanzar({ reg: { foto_id: reg.foto_id, ruta: reg.ruta }, subida: false });
+    }
+    if (!f.subida) {
+      let fallo: unknown = null;
+      try {
+        const { error } = await supabase.storage.from(BUCKET_FOTOS).upload(f.reg!.ruta, f.blob, { contentType: f.tipo, upsert: false, cacheControl: '3600' });
+        fallo = error;
+      } catch (e) { fallo = e; }
+      if (fallo && !archivoYaExiste(fallo)) throw errorAlmacenamiento(fallo, 'subir');
+      await avanzar({ subida: true });
+    }
+    await confirmarFoto(f.reg!.foto_id);
+  };
+  try {
+    await pasos();
+  } catch (e) {
+    const codigo = aApiError(e).codigo;
+    // El registro venció (pasó más de 1 hora) o ya no vale: se pide uno nuevo y se repite una sola vez.
+    if (f.reg && (codigo === 'E_NO_ENCONTRADO' || codigo === 'E_PERMISO')) {
+      await avanzar({ reg: undefined, subida: false });
+      await pasos();
+      return;
+    }
+    throw e;
+  }
+}
+
 export async function borrarFoto(foto: Pick<FotoRemota, 'foto_id' | 'ruta'>): Promise<void> {
   const { error } = await supabase.storage.from(BUCKET_FOTOS).remove([foto.ruta]);
   if (error) throw errorAlmacenamiento(error, 'borrar');

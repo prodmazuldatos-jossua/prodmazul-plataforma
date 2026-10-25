@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const cerrarSesion = async () => {
     if ((await contarPendientes()) > 0 &&
-        !window.confirm('Hay registros guardados en este dispositivo que aún no se enviaron. Si cierras sesión ahora se enviarán cuando vuelvas a entrar. ¿Cerrar sesión?')) return;
+        !window.confirm('Hay recepciones guardadas en este dispositivo que aún no se enviaron. Si cierras sesión ahora NO se pierden: se enviarán cuando vuelvas a entrar con tu usuario. ¿Cerrar sesión?')) return;
     await supabase.auth.signOut();
     try { localStorage.removeItem(CLAVE_PERFIL); } catch { /* sin almacenamiento */ }
   };

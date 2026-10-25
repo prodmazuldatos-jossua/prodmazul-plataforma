@@ -15,7 +15,18 @@ export const listarCatalogo = (tipo: 'proveedores' | 'especies' | 'lotes', busqu
 
 export const obtenerLote = (lote: string) => llamar<InfoLote>('api_obtener_lote', { p_lote: lote });
 
-export const guardarRecepcion = (p: Record<string, unknown>) => llamar<RespuestaGuardar>('api_m01_guardar_recepcion', { p });
+/** Segundos que se espera la respuesta al guardar antes de darla por perdida (se trata como falta de conexión). */
+export const ESPERA_GUARDAR_MS = 30_000;
+
+/**
+ * Guarda una recepción. Si en ESPERA_GUARDAR_MS no hay respuesta, se corta y se trata como «sin conexión»:
+ * la recepción pudo haber llegado al servidor, pero reenviar el mismo client_uuid no la duplica.
+ */
+export async function guardarRecepcion(p: Record<string, unknown>, esperaMs = ESPERA_GUARDAR_MS): Promise<RespuestaGuardar> {
+  const { data, error } = await supabase.rpc('api_m01_guardar_recepcion', { p }).abortSignal(AbortSignal.timeout(esperaMs));
+  if (error) throw aApiError(error);
+  return data as RespuestaGuardar;
+}
 
 export const listarRecepciones = (f: FiltrosListado) =>
   llamar<RespuestaListado>('api_m01_listar_recepciones', {

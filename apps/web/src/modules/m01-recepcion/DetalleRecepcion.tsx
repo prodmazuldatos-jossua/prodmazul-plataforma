@@ -6,6 +6,7 @@ import { aApiError, mensajeDe } from '../../lib/errores';
 import { formatoFecha, formatoFechaHora, formatoHora } from '../../lib/fechas';
 import { textoCantidad } from '../../lib/texto';
 import { useUnidad } from '../../lib/unidades';
+import { useOnline } from '../../lib/conexion';
 import { anularRecepcion, eliminarRecepcion, obtenerRecepcion, reactivarRecepcion } from './api';
 import { pesoPromedio, redondear } from './calculos';
 import GaleriaFotos from './GaleriaFotos';
@@ -32,6 +33,7 @@ export default function DetalleRecepcion() {
   const { id = '' } = useParams();
   const { state } = useLocation() as { state: { aviso?: string } | null };
   const { perfil, puede } = useAuth();
+  const online = useOnline();
   const { texto: peso } = useUnidad();
   const [r, setR] = useState<RecepcionDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,12 +115,17 @@ export default function DetalleRecepcion() {
           <h1>Recepción {r.recepcion_id} <InsigniaEstado estado={r.estado} /></h1>
         </div>
         <div className="acciones-fila acciones-detalle">
-          {cap.editar && <Link className="boton-primario enlace-boton" to={`/m01/${r.recepcion_id}/editar`}>Editar</Link>}
-          {cap.anular && <button type="button" className="boton-secundario" onClick={() => setAccion('anular')}>Anular</button>}
-          {cap.reactivar && <button type="button" className="boton-secundario" onClick={() => setAccion('reactivar')}>Reactivar</button>}
-          {cap.eliminar && <button type="button" className="boton-peligro" onClick={() => setAccion('eliminar')}>Eliminar</button>}
+          {cap.editar && (online
+            ? <Link className="boton-primario enlace-boton" to={`/m01/${r.recepcion_id}/editar`}>Editar</Link>
+            : <button type="button" className="boton-primario" disabled>Editar</button>)}
+          {cap.anular && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('anular')}>Anular</button>}
+          {cap.reactivar && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('reactivar')}>Reactivar</button>}
+          {cap.eliminar && <button type="button" className="boton-peligro" disabled={!online} onClick={() => setAccion('eliminar')}>Eliminar</button>}
         </div>
       </div>
+      {!online && (cap.editar || cap.anular || cap.reactivar || cap.eliminar) && (
+        <p className="ayuda" data-testid="aviso-sin-red-acciones">Sin conexión: editar, anular, eliminar y reactivar necesitan señal. Vuelven a activarse solos cuando regrese.</p>
+      )}
 
       {aviso && <Alerta tipo="exito">{aviso}</Alerta>}
       {r.estado === 'anulado' && (
