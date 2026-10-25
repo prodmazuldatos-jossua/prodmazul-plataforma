@@ -124,3 +124,30 @@ button:disabled { opacity: .55; cursor: not-allowed; }
   .lateral-pie .usuario { display: none; }
   .lateral-pie .boton-ancho { width: auto; }
 }
+
+/* ---------- formulario de recepción (Parte 6) */
+.tarjeta-ancha { max-width: 60rem; }
+.rejilla-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0 1.25rem; }
+.rejilla-form .campo { min-width: 0; }
+.obligatorio { color: var(--rojo); }
+.campo textarea { min-height: 6rem; resize: vertical; }
+.campo input:read-only, .campo input:disabled { background: var(--hielo); color: var(--suave); }
+.enlace-boton { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.acciones-fila { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+.aviso-campo { margin: .15rem 0 0; padding: .45rem .7rem; border-radius: 8px; font-size: .92rem; border: 1px solid; }
+.aviso-campo p { margin: .15rem 0; }
+.aviso-ok { background: var(--verde-fondo); border-color: #9AD7B8; color: #135C3A; }
+.aviso-nuevo { background: var(--hielo); border-color: var(--celeste); color: var(--marino); }
+.aviso-parecido { background: var(--ambar-fondo); border-color: #F0D58A; color: var(--ambar); }
+.aviso-lote { background: var(--verde-fondo); border-color: #9AD7B8; color: #135C3A; }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .4rem; }
+.chip { min-height: 44px; padding: 0 .9rem; border-radius: 999px; border: 2px solid var(--celeste); background: var(--blanco); color: var(--marino); font-weight: 600; }
+.chip:hover { background: var(--hielo); }
+.panel-calculos { background: var(--hielo); border: 1px solid var(--celeste); border-radius: var(--radio); padding: 1rem 1.25rem; margin: 1rem 0; max-width: 60rem; }
+.panel-calculos dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem 1.25rem; margin: 0; }
+.panel-calculos dt { font-size: .85rem; color: var(--suave); }
+.panel-calculos dd { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--marino); }
+.panel-calculos dd.negativo { color: var(--rojo); }
+.panel-calculos dd.positivo { color: var(--verde); }
+.tarjeta-pendiente { border-style: dashed; background: transparent; }
+.barra-acciones { position: sticky; bottom: 0; display: flex; gap: .75rem; justify-content: flex-end; flex-wrap: wrap; padding: .75rem 0; margin-top: 1rem; background: linear-gradient(180deg, transparent, var(--fondo) 30%); max-width: 60rem; }

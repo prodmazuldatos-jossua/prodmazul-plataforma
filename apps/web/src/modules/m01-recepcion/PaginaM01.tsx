@@ -1,30 +1,39 @@
+import { Link, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../../core/auth/AuthContext';
-import { Alerta } from '../../core/ui';
+import { Alerta, Vacio } from '../../core/ui';
+import FormularioRecepcion from './FormularioRecepcion';
 
-const ETIQUETAS: Record<string, string> = {
-  ver: 'Ver registros', crear: 'Crear registros', editar: 'Editar registros', anular: 'Anular registros',
-  eliminar: 'Eliminar y reactivar', cargar_imagenes: 'Cargar fotos', ver_reportes: 'Ver reportes', admin_config: 'Administrar configuración',
-};
 const ROLES: Record<string, string> = {
   admin_general: 'Administrador general', admin_modulo: 'Administrador de módulo', operativo: 'Usuario operativo', consulta: 'Usuario de consulta',
 };
 
-/** Página provisional del módulo: confirma el acceso y los permisos. El formulario llega en la Parte 2. */
-export default function PaginaM01() {
-  const { perfil } = useAuth();
+function InicioM01() {
+  const { perfil, puede } = useAuth();
   const acceso = perfil?.modulos.find((m) => m.modulo_id === 'M01');
   return (
     <>
       <h1>Recepción</h1>
-      <Alerta tipo="info">El formulario, el listado y las demás pantallas de este módulo se activan en la Parte 2.</Alerta>
-      <section className="tarjeta">
-        <h2>Tu acceso a este módulo</h2>
-        <p><strong>Rol:</strong> {acceso ? ROLES[acceso.rol_id] ?? acceso.rol_id : 'Sin acceso'}</p>
-        <p><strong>Permisos:</strong></p>
-        <ul>
-          {(acceso?.permisos ?? []).map((p) => <li key={p}>{ETIQUETAS[p] ?? p}</li>)}
-        </ul>
-      </section>
+      <p className="texto-suave">Tu rol: <strong>{acceso ? ROLES[acceso.rol_id] ?? acceso.rol_id : 'Sin acceso'}</strong></p>
+      <Alerta tipo="info">El listado de recepciones llega en la Parte 8. Por ahora puedes registrar una recepción nueva.</Alerta>
+      {puede('M01', 'crear') && <Link className="boton-primario enlace-boton" to="/m01/nueva">Nueva recepción</Link>}
     </>
+  );
+}
+
+function SoloCrear({ children }: { children: React.ReactNode }) {
+  const { puede } = useAuth();
+  if (!puede('M01', 'crear')) {
+    return <Vacio titulo="Sin permiso"><p>Tu rol no permite registrar recepciones.</p></Vacio>;
+  }
+  return <>{children}</>;
+}
+
+export default function PaginaM01() {
+  return (
+    <Routes>
+      <Route index element={<InicioM01 />} />
+      <Route path="nueva" element={<SoloCrear><FormularioRecepcion /></SoloCrear>} />
+      <Route path="*" element={<InicioM01 />} />
+    </Routes>
   );
 }

@@ -1,10 +1,12 @@
-PRODMAZUL · FASE 4 · PARTE 5 · Anular, eliminar y reactivar recepciones (base de datos)
+PRODMAZUL · FASE 4 · PARTE 6 · Formulario de recepción (1 de 2): datos generales, lote y cierre
 
 Contenido
-  supabase/migrations/   1 migración nueva (20261020000006_api_estados.sql) con 3 funciones api_
-  tests/sql/             parte5.mjs (52 pruebas automáticas) y package.json actualizado (corre las Partes 1, 2, 4 y 5)
-  docs/                  prueba_parte5.sql (se ejecuta en Supabase), prueba_api_parte5.ps1 (se ejecuta en PowerShell)
+  apps/web/src/          Formulario de recepción: campos, cálculos en vivo, lote con acumulado, proveedor y especie con
+                         sugerencias, aviso al salir. Reemplaza App.tsx, styles.css y PaginaM01.tsx de la Parte 3.
+  supabase/migrations/   1 migración nueva (20261020000007_lote_acumulado.sql): api_obtener_lote devuelve camiones y libras
+  tests/sql/             parte6.mjs (20 pruebas automáticas) y package.json actualizado (corre las Partes 1, 2, 4, 5 y 6)
+  docs/                  prueba_parte6.sql (se ejecuta en Supabase)
 
-Se copia ENCIMA de la carpeta del repositorio, junto con lo de las Partes anteriores.
-Todo se explica paso a paso en la guía: Fase4_Parte5_Guia.html
-No incluye contraseñas, claves ni tokens: el script de PowerShell las pide al ejecutarse.
+Se copia ENCIMA de la carpeta del repositorio (no toca .env.local, node_modules ni el package.json de la aplicación).
+Todo se explica paso a paso en la guía: Fase4_Parte6_Guia.html
+No incluye contraseñas, claves ni tokens.

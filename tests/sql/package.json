@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node parte1.mjs && node parte2.mjs && node parte4.mjs && node parte5.mjs",
+    "test": "node parte1.mjs && node parte2.mjs && node parte4.mjs && node parte5.mjs && node parte6.mjs",
     "test:parte1": "node parte1.mjs",
     "test:parte2": "node parte2.mjs",
     "test:parte4": "node parte4.mjs",
-    "test:parte5": "node parte5.mjs"
+    "test:parte5": "node parte5.mjs",
+    "test:parte6": "node parte6.mjs"
   },
   "devDependencies": { "@electric-sql/pglite": "^0.5.10" }
 }
