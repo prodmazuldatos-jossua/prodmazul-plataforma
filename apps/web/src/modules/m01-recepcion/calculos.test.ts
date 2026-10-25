@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diferenciaLb, diferenciaPct, duracionMin, pesoPromedio, redondear, textoDuracion } from './calculos';
+import { promedioBloque, totalLibrasAprox, totalPesos, diferenciaLb, diferenciaPct, duracionMin, pesoPromedio, redondear, textoDuracion } from './calculos';
 
 describe('redondear', () => {
   it('redondea a 2 decimales como la base de datos', () => {
@@ -57,4 +57,20 @@ describe('peso promedio', () => {
     expect(pesoPromedio([10, 20, 25])).toBe(18.33);
   });
   it('sin gavetas no hay promedio', () => { expect(pesoPromedio([])).toBeNull(); });
+});
+
+describe('bloques de gavetas', () => {
+  const g = Array.from({ length: 30 }, () => null as number | null);
+  g[0] = 50; g[1] = 60; g[10] = 70; g[29] = 10;
+  it('promedio por bloque de 10', () => {
+    expect(promedioBloque(g, 0)).toBe(55);
+    expect(promedioBloque(g, 1)).toBe(70);
+    expect(promedioBloque(g, 2)).toBe(10);
+  });
+  it('un bloque vacío no tiene promedio', () => { expect(promedioBloque(Array.from({ length: 30 }, () => null), 0)).toBeNull(); });
+  it('suma los pesos presentes', () => { expect(totalPesos(g)).toBe(190); });
+  it('suma las libras aproximadas de almacenamiento', () => {
+    const f = (l: number | null) => ({ num_bin: 'B', sellos_recepcion: '', sellos_almacenamiento: '', temperatura_c: null, libras_aprox: l });
+    expect(totalLibrasAprox([f(100), f(null), f(50.5)])).toBe(150.5);
+  });
 });

@@ -1,12 +1,12 @@
-PRODMAZUL · FASE 4 · PARTE 6 · Formulario de recepción (1 de 2): datos generales, lote y cierre
+Prodmazul - Fase 4 - Parte 7: Formulario de recepcion (2 de 2) - version con ajustes
+Gavetas, temperaturas por gaveta, almacenamiento, cierre de lote y cierre de la recepcion.
 
-Contenido
-  apps/web/src/          Formulario de recepción: campos, cálculos en vivo, lote con acumulado, proveedor y especie con
-                         sugerencias, aviso al salir. Reemplaza App.tsx, styles.css y PaginaM01.tsx de la Parte 3.
-  supabase/migrations/   1 migración nueva (20261020000007_lote_acumulado.sql): api_obtener_lote devuelve camiones y libras
-  tests/sql/             parte6.mjs (20 pruebas automáticas) y package.json actualizado (corre las Partes 1, 2, 4, 5 y 6)
-  docs/                  prueba_parte6.sql (se ejecuta en Supabase)
+Contenido:
+  supabase/migrations/    Migracion 8 (cierre de lote, temperaturas por gaveta) y migracion 9 (bines o gavetas, nombre del usuario).
+  apps/web/src/...        Secciones del formulario, validaciones, calculos, estilos y pruebas.
+  tests/sql/              parte2, parte4 y parte7 actualizadas y package.json (partes 1, 2, 4, 5, 6 y 7).
+  docs/                   prueba_parte7.sql (prueba dentro de tu proyecto), prueba_parte4.sql y prueba_api_parte4.ps1
+                          actualizadas, y datos_demo_cargar.sql / datos_demo_borrar.sql (opcionales) y
+                          asignar_nombres.sql (plantilla para poner el nombre a cada usuario).
 
-Se copia ENCIMA de la carpeta del repositorio (no toca .env.local, node_modules ni el package.json de la aplicación).
-Todo se explica paso a paso en la guía: Fase4_Parte6_Guia.html
-No incluye contraseñas, claves ni tokens.
+Copiar sobre el repositorio con Copy-Item ... -Recurse -Force (ver la guia, paso 2) y luego aplicar las migraciones 8 y 9.

@@ -134,7 +134,7 @@ ok('peso de gaveta negativo rechazado', await falla(`insert into m01_recepcion.r
 ok('gaveta de una recepción inexistente rechazada', await falla(`insert into m01_recepcion.recepcion_gavetas values ('REC-20269999-0001',1,40)`, /foreign key/));
 ok('temperatura negativa permitida', !(await falla(`insert into m01_recepcion.recepcion_temperaturas values ('${id1}',1,'1,2',-1.5)`)));
 ok('temperatura con un decimal se guarda tal cual', (await db.query(`select temperatura_c from m01_recepcion.recepcion_temperaturas where recepcion_id='${id1}' and lectura_id=1`)).rows[0].temperatura_c === '-1.5' || Number((await db.query(`select temperatura_c from m01_recepcion.recepcion_temperaturas where recepcion_id='${id1}' and lectura_id=1`)).rows[0].temperatura_c) === -1.5);
-ok('lectura 7 rechazada', await falla(`insert into m01_recepcion.recepcion_temperaturas values ('${id1}',7,'1',-1)`, /check/));
+ok('lectura 31 rechazada', await falla(`insert into m01_recepcion.recepcion_temperaturas values ('${id1}',31,'1',-1)`, /check/));
 ok('lectura 0 rechazada', await falla(`insert into m01_recepcion.recepcion_temperaturas values ('${id1}',0,'1',-1)`, /check/));
 ok('lectura repetida rechazada', await falla(`insert into m01_recepcion.recepcion_temperaturas values ('${id1}',1,'3',2)`, /duplicate key/));
 ok('almacenamiento válido', !(await falla(`insert into m01_recepcion.recepcion_almacenamiento values ('${id1}','1','A1','B1',-1,500)`)));

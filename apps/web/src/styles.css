@@ -151,3 +151,34 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .panel-calculos dd.positivo { color: var(--verde); }
 .tarjeta-pendiente { border-style: dashed; background: transparent; }
 .barra-acciones { position: sticky; bottom: 0; display: flex; gap: .75rem; justify-content: flex-end; flex-wrap: wrap; padding: .75rem 0; margin-top: 1rem; background: linear-gradient(180deg, transparent, var(--fondo) 30%); max-width: 60rem; }
+
+/* ===== Parte 7: gavetas, temperaturas y almacenamiento ===== */
+.nav-secciones { position: sticky; top: 0; z-index: 5; display: flex; gap: .5rem; overflow-x: auto; padding: .5rem 0; background: var(--fondo, #fff); }
+.insignia-error { margin-left: .4rem; background: #b42318; color: #fff; border-radius: 999px; padding: 0 .45rem; font-size: .8rem; }
+.bloques-gavetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+.fila-gaveta { display: flex; align-items: center; gap: .5rem; margin-bottom: .35rem; }
+.num-gaveta { width: 1.8rem; text-align: right; font-weight: 600; }
+.promedio-bloque { margin-top: .5rem; }
+.resumen-gavetas { margin-top: 1rem; }
+.lecturas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+.lectura { border: 1px solid #d0d5dd; border-radius: .6rem; padding: .75rem; }
+.lectura-titulo, .fila-alm-titulo { font-weight: 600; margin: 0 0 .5rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
+.chip-bin { min-width: 3.2rem; min-height: 2.75rem; font-size: 1.05rem; }
+.chip-activo { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+.chip-invalido { background: #b42318; border-color: #b42318; }
+.campo-con-boton { display: flex; gap: .4rem; }
+.boton-signo { min-width: 3rem; font-size: 1.2rem; }
+.filas-almacenamiento { display: grid; gap: 1rem; }
+.fila-alm { border: 1px solid #d0d5dd; border-radius: .6rem; padding: .75rem; }
+.rejilla-alm { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .75rem; }
+.etiqueta-falsa { margin: 0 0 .25rem; font-size: .9rem; }
+.total-alm { margin: 0; }
+.filas-temperatura { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+.rejilla-lectura { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.grupo-lote { border: 1px solid #d0d5dd; border-radius: .6rem; padding: .75rem; grid-column: 1 / -1; }
+.grupo-lote legend { font-weight: 600; padding: 0 .4rem; }
+.opcion-radio { display: flex; gap: .6rem; align-items: flex-start; padding: .5rem 0; min-height: 2.75rem; }
+.opcion-radio input { width: 1.4rem; height: 1.4rem; margin-top: .1rem; }
+.leyenda-cantidad { margin: .25rem 0 0; font-weight: 700; color: var(--azul-oscuro, #0b2a5b); }
+.grupo-lote .interruptor { margin: .25rem 0 .5rem; }

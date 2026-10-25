@@ -61,7 +61,7 @@ const base = (extra = {}) => ({
   libras_reportadas: 1000, libras_planta: 990, hora_inicio_descarga: '08:00', hora_fin_descarga: '09:30',
   observacion: 'Sin novedad',
   gavetas: [{ num_gaveta: 1, peso_lb: 100 }, { num_gaveta: 2, peso_lb: 110 }, { num_gaveta: 3, peso_lb: 120 }],
-  temperaturas: [{ lectura_id: 1, bines: 'B1', temperatura_c: 2.5 }],
+  temperaturas: [{ lectura_id: 1, num_gaveta: 1, temperatura_c: 2.5 }],
   almacenamiento: [{ num_bin: 'B1', sellos_recepcion: 'S1', sellos_almacenamiento: 'A1', temperatura_c: 2.5, libras_aprox: 500 },
                    { num_bin: 'B2', sellos_recepcion: 'S2', sellos_almacenamiento: 'A2', temperatura_c: 3, libras_aprox: 490 }],
   ...extra,
@@ -122,7 +122,7 @@ await v('peso de gaveta no numérico', { gavetas: [{ num_gaveta: 1, peso_lb: 'mu
 await v('estado no permitido', { estado: 'anulado' });
 await v('cerrar sin libras de planta', { libras_planta: null });
 await v('cerrar sin gavetas', { gavetas: [] });
-await v('temperatura de un bin que no existe en almacenamiento', { temperaturas: [{ lectura_id: 1, bines: 'B9', temperatura_c: 2 }] });
+await v('temperatura de una gaveta que no tiene peso registrado', { temperaturas: [{ lectura_id: 1, num_gaveta: 9, temperatura_c: 2 }] });
 await v('client_uuid inválido', { client_uuid: 'no-es-uuid' });
 await v('gavetas con número repetido', { gavetas: [{ num_gaveta: 1, peso_lb: 10 }, { num_gaveta: 1, peso_lb: 11 }] }, 'E_DUPLICADO');
 await v('sellos repetidos entre bines', { almacenamiento: [{ num_bin: 'B1', sellos_recepcion: 'X' }, { num_bin: 'B2', sellos_recepcion: 'X' }], temperaturas: [] }, 'E_DUPLICADO');

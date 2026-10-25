@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 interface CampoProps { id: string; etiqueta: string; error?: string; ayuda?: string; obligatorio?: boolean; children: ReactNode }
 
@@ -29,5 +29,75 @@ export function CampoTexto({ id, etiqueta, value, onChange, error, ayuda, obliga
         onChange={(e) => onChange(mayusculas ? e.target.value.toUpperCase() : e.target.value)}
       />
     </Campo>
+  );
+}
+
+interface TemperaturaProps {
+  id: string; value: number | null; onChange: (v: number | null) => void; error?: string; etiqueta?: string; etiquetaAria?: string;
+}
+
+const formatoTemp = (v: number | null) => (v === null ? '' : String(v));
+
+/**
+ * Temperatura en °C con botón ± (los teclados numéricos de las tabletas no traen el signo menos).
+ * Acepta un decimal; el valor se guarda redondeado a 1 decimal.
+ */
+export function TemperaturaInput({ id, value, onChange, error, etiqueta, etiquetaAria }: TemperaturaProps) {
+  const [texto, setTexto] = useState(formatoTemp(value));
+  const enfocado = useRef(false);
+  const entrada = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!enfocado.current) setTexto(formatoTemp(value));
+  }, [value]);
+
+  const cambiar = (t: string) => {
+    const limpio = t.replace(',', '.');
+    if (!/^-?\d*\.?\d*$/.test(limpio)) return;
+    setTexto(limpio);
+    if (limpio === '' || limpio === '-' || limpio === '.' || limpio === '-.') onChange(null);
+    else onChange(Math.round(Number(limpio) * 10) / 10);
+  };
+  const cambiarSigno = () => {
+    enfocado.current = true;
+    cambiar(texto.startsWith('-') ? texto.slice(1) : `-${texto}`);
+    entrada.current?.focus();
+  };
+
+  return (
+    <div className="campo campo-compacto">
+      {etiqueta && <label htmlFor={id}>{etiqueta} <span className="unidad-etiqueta">(°C)</span></label>}
+      <div className="campo-con-boton">
+        <input
+          id={id} ref={entrada} type="text" inputMode="decimal" autoComplete="off" value={texto} placeholder="°C"
+          aria-label={etiqueta ? undefined : etiquetaAria} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
+          onFocus={() => { enfocado.current = true; }}
+          onBlur={() => { enfocado.current = false; setTexto(formatoTemp(value)); }}
+          onChange={(e) => cambiar(e.target.value)}
+        />
+        <button type="button" className="boton-secundario boton-signo" aria-label="Cambiar signo (más o menos)" onClick={cambiarSigno}>±</button>
+      </div>
+      {error && <p className="error-campo" id={`${id}-error`}>{error}</p>}
+    </div>
+  );
+}
+
+interface ConmutadorProps<T extends string> {
+  opciones: { valor: T; texto: string }[];
+  valor: T;
+  onChange: (v: T) => void;
+  ariaLabel: string;
+  idBase: string;
+}
+
+/** Interruptor de dos (o más) opciones, grande y táctil, con el mismo aspecto que Lb / Kg. */
+export function Conmutador<T extends string>({ opciones, valor, onChange, ariaLabel, idBase }: ConmutadorProps<T>) {
+  return (
+    <div className="interruptor" role="group" aria-label={ariaLabel}>
+      {opciones.map((o) => (
+        <button type="button" key={o.valor} id={`${idBase}-${o.valor}`} className={valor === o.valor ? 'activo' : ''}
+                aria-pressed={valor === o.valor} onClick={() => onChange(o.valor)}>{o.texto}</button>
+      ))}
+    </div>
   );
 }

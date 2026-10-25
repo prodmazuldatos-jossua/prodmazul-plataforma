@@ -59,6 +59,7 @@ export default function CampoLote({ value, onChange, formatoLote, error, onInfo 
             <p><strong>Lote existente.</strong> Ya tiene {info.camiones} {info.camiones === 1 ? 'camión' : 'camiones'} registrados.</p>
             <p>Libras reportadas acumuladas: <strong>{peso(info.libras_reportadas)}</strong> · Libras de planta acumuladas: <strong>{peso(info.libras_planta)}</strong></p>
             <p className="ayuda">El proveedor se toma del lote y no se puede cambiar aquí.</p>
+            {info.cerrado && <p className="error-campo" role="alert" data-testid="lote-cerrado">Este lote está <strong>cerrado</strong>: no admite más camiones. Un administrador puede reabrirlo.</p>}
           </div>
         )}
         {!cargando && info && !info.existe && (

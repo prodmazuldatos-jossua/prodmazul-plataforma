@@ -44,3 +44,31 @@ export function hayCoincidenciaExacta(escrito: string, nombres: string[]): boole
   const n = normalizar(escrito);
   return n !== '' && nombres.some((x) => normalizar(x) === n);
 }
+
+/**
+ * Autocompletar: primer nombre del catálogo que empieza con lo escrito (sin distinguir mayúsculas ni tildes)
+ * y que es más largo que lo escrito. Devuelve null si no hay ninguno.
+ */
+export function completar(escrito: string, nombres: string[]): string | null {
+  const n = normalizar(escrito);
+  if (n.length < 2) return null;
+  return nombres.find((x) => { const m = normalizar(x); return m.length > n.length && m.startsWith(n); }) ?? null;
+}
+
+/** Nombre del catálogo igual a lo escrito (ignorando mayúsculas, tildes y espacios repetidos), con su escritura oficial. */
+export function nombreOficial(escrito: string, nombres: string[]): string | null {
+  const n = normalizar(escrito);
+  return n === '' ? null : nombres.find((x) => normalizar(x) === n) ?? null;
+}
+
+/** «5 bines», «1 bin», «12 gavetas», «1 gaveta». */
+export function textoCantidad(n: number, tipo: 'bines' | 'gavetas'): string {
+  const singular = tipo === 'bines' ? 'bin' : 'gaveta';
+  return `${n} ${n === 1 ? singular : tipo}`;
+}
+
+/** Etiqueta del módulo en las pantallas: «M01» pasa a «Módulo 1», «M12» a «Módulo 12». */
+export function etiquetaModulo(id: string): string {
+  const m = /^M0*(\d+)$/i.exec(id.trim());
+  return m ? `Módulo ${m[1]}` : id;
+}

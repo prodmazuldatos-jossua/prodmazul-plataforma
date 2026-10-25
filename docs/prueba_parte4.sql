@@ -33,7 +33,7 @@ begin
     'num_gavetas_bines', 3, 'libras_reportadas', 1000, 'libras_planta', 990,
     'hora_inicio_descarga', '08:00', 'hora_fin_descarga', '09:30',
     'gavetas', jsonb_build_array(jsonb_build_object('num_gaveta',1,'peso_lb',100), jsonb_build_object('num_gaveta',2,'peso_lb',110), jsonb_build_object('num_gaveta',3,'peso_lb',120)),
-    'temperaturas', jsonb_build_array(jsonb_build_object('lectura_id',1,'bines','B1','temperatura_c',2.5)),
+    'temperaturas', jsonb_build_array(jsonb_build_object('lectura_id',1,'num_gaveta',1,'temperatura_c',2.5)),
     'almacenamiento', jsonb_build_array(jsonb_build_object('num_bin','B1','sellos_recepcion','S1','sellos_almacenamiento','A1','temperatura_c',2.5,'libras_aprox',500)));
 
   -- Actuar como el administrador (igual que cuando la aplicación llama a la API con su sesión)
@@ -52,7 +52,7 @@ begin
   begin v_r := public.api_m01_guardar_recepcion((v_base || '{}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text)) || jsonb_build_object('guia_remision','ZZ-G1','client_uuid','11111111-1111-1111-1111-111111111111')); exception when others then v_e := sqlerrm; end;
   if v_e is null and ((v_r->>'duplicado')::boolean and v_r->>'recepcion_id' = v_id) then v_ok := v_ok + 1; else v_mal := v_mal + 1; v_txt := v_txt || E'\n  FALLÓ: reenviar el mismo envío no duplica ' || coalesce(v_e, coalesce(v_r::text, '')); end if;
   v_e := null; v_r := null;
-  begin v_r := public.api_m01_guardar_recepcion((v_base || '{"estado": "borrador", "libras_planta": null, "gavetas": []}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text))); exception when others then v_e := sqlerrm; end;
+  begin v_r := public.api_m01_guardar_recepcion((v_base || '{"estado": "borrador", "libras_planta": null, "gavetas": [], "temperaturas": []}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text))); exception when others then v_e := sqlerrm; end;
   if v_e is null and (v_r->>'estado' = 'borrador') then v_ok := v_ok + 1; else v_mal := v_mal + 1; v_txt := v_txt || E'\n  FALLÓ: un borrador incompleto se guarda ' || coalesce(v_e, coalesce(v_r::text, '')); end if;
   v_e := null; v_r := null;
   begin v_r := public.api_m01_guardar_recepcion((v_base || '{"proveedor": "OTRO NOMBRE"}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text))); exception when others then v_e := sqlerrm; end;
@@ -78,8 +78,8 @@ begin
   begin perform public.api_m01_guardar_recepcion((v_base || '{}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text)) || jsonb_build_object('hora_inicio_descarga','10:00','hora_fin_descarga','09:00')); exception when others then v_e := sqlerrm; end;
   if v_e like 'E_VALIDACION|%' then v_ok := v_ok + 1; else v_mal := v_mal + 1; v_txt := v_txt || E'\n  FALLÓ: hora fin antes del inicio ' || coalesce(v_e, '(no dio error)'); end if;
   v_e := null;
-  begin perform public.api_m01_guardar_recepcion((v_base || '{}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text)) || jsonb_build_object('temperaturas', jsonb_build_array(jsonb_build_object('lectura_id',1,'bines','B9','temperatura_c',2)))); exception when others then v_e := sqlerrm; end;
-  if v_e like 'E_VALIDACION|%' then v_ok := v_ok + 1; else v_mal := v_mal + 1; v_txt := v_txt || E'\n  FALLÓ: temperatura de un bin inexistente ' || coalesce(v_e, '(no dio error)'); end if;
+  begin perform public.api_m01_guardar_recepcion((v_base || '{}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text)) || jsonb_build_object('temperaturas', jsonb_build_array(jsonb_build_object('lectura_id',1,'num_gaveta',9,'temperatura_c',2)))); exception when others then v_e := sqlerrm; end;
+  if v_e like 'E_VALIDACION|%' then v_ok := v_ok + 1; else v_mal := v_mal + 1; v_txt := v_txt || E'\n  FALLÓ: temperatura de una gaveta sin peso ' || coalesce(v_e, '(no dio error)'); end if;
   v_e := null;
   begin perform public.api_m01_guardar_recepcion((v_base || '{}'::jsonb || jsonb_build_object('client_uuid', gen_random_uuid(), 'guia_remision', 'ZZ-' || gen_random_uuid()::text)) || jsonb_build_object('gavetas','[]'::jsonb)); exception when others then v_e := sqlerrm; end;
   if v_e like 'E_VALIDACION|%' then v_ok := v_ok + 1; else v_mal := v_mal + 1; v_txt := v_txt || E'\n  FALLÓ: cerrar sin gavetas ' || coalesce(v_e, '(no dio error)'); end if;

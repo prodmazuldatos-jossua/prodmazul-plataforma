@@ -5,13 +5,18 @@ import { Alerta, Modal } from '../../core/ui';
 import { PesoInput } from '../../lib/unidades';
 import { aApiError } from '../../lib/errores';
 import { hoyEcuador } from '../../lib/fechas';
-import { Campo, CampoTexto } from './controles';
+import { Campo, CampoTexto, Conmutador } from './controles';
+import { textoCantidad } from '../../lib/texto';
 import CampoLote from './CampoLote';
 import SelectorCatalogo from './SelectorCatalogo';
+import NavSecciones from './NavSecciones';
+import SeccionGavetas from './SeccionGavetas';
+import SeccionTemperaturas from './SeccionTemperaturas';
+import SeccionAlmacenamiento from './SeccionAlmacenamiento';
 import PanelCalculos from './PanelCalculos';
 import { guardarRecepcion, obtenerConfig } from './api';
-import { aPayload, validarRecepcion } from './esquema';
-import { FORMATO_LOTE_POR_DEFECTO, type CampoForm, type Errores, type FormRecepcion, type InfoLote, type RespuestaGuardar } from './tipos';
+import { aPayload, erroresPorSeccion, validarRecepcion } from './esquema';
+import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type InfoLote, type RespuestaGuardar } from './tipos';
 
 const ORDEN_CAMPOS: CampoForm[] = [
   'fecha_llegada', 'placa_vehiculo', 'lote_id', 'proveedor', 'especie', 'piscina', 'guia_remision', 'num_gavetas_bines',
@@ -20,13 +25,13 @@ const ORDEN_CAMPOS: CampoForm[] = [
 
 const vacio = (): FormRecepcion => ({
   fecha_llegada: hoyEcuador(), placa_vehiculo: '', lote_id: '', proveedor: '', especie: '', piscina: '', guia_remision: '',
-  num_gavetas_bines: '', libras_reportadas: null, libras_planta: null, hora_inicio_descarga: '', hora_fin_descarga: '',
-  observacion: '', gavetas: [], temperaturas: [], almacenamiento: [],
+  llegada_en: 'bines', num_gavetas_bines: '', libras_reportadas: null, libras_planta: null, hora_inicio_descarga: '', hora_fin_descarga: '',
+  observacion: '', cerrar_lote: false, gavetas: gavetasVacias(), temperaturas: lecturasVacias(), almacenamiento: [filaAlmacenamientoVacia()],
 });
 
 type Mensaje = { tipo: 'exito' | 'error' | 'aviso'; texto: string } | null;
 
-/** Formulario de recepción, Parte 6: datos generales, lote y cierre. Gavetas, temperaturas y almacenamiento llegan en la Parte 7. */
+/** Formulario de recepción completo: datos generales, gavetas, temperaturas, almacenamiento y cierre. */
 export default function FormularioRecepcion() {
   const { perfil } = useAuth();
   const [f, setF] = useState<FormRecepcion>(vacio);
@@ -76,15 +81,36 @@ export default function FormularioRecepcion() {
     }
   }, []);
 
+  const cambiarGaveta = useCallback((i: number, lb: number | null) => {
+    setF((p) => ({ ...p, gavetas: p.gavetas.map((g, k) => (k === i ? lb : g)) }));
+    setSucio(true); setMensaje(null);
+    setErrores((e) => (e.filas?.gavetas[i] || e.gavetas ? { ...e, gavetas: undefined, filas: e.filas && { ...e.filas, gavetas: { ...e.filas.gavetas, [i]: undefined as never } } } : e));
+  }, []);
+  const cambiarLecturas = useCallback((lecturas: LecturaForm[]) => {
+    setF((p) => ({ ...p, temperaturas: lecturas }));
+    setSucio(true); setMensaje(null);
+    setErrores((e) => (e.filas ? { ...e, filas: { ...e.filas, lecturas: {} } } : e));
+  }, []);
+  const cambiarAlmacenamiento = useCallback((filas: AlmacenamientoForm[]) => {
+    setF((p) => ({ ...p, almacenamiento: filas }));
+    setSucio(true); setMensaje(null);
+    setErrores((e) => (e.filas ? { ...e, filas: { ...e.filas, almacenamiento: {} } } : e));
+  }, []);
+
   const guardar = async (estado: 'borrador' | 'cerrado') => {
     const loteExiste = infoLote ? infoLote.existe : null;
-    const errs = validarRecepcion(f, { formatoLote, hoy: hoyEcuador(), cerrando: estado === 'cerrado', loteExiste });
-    const claves = Object.keys(errs) as CampoForm[];
-    if (claves.length > 0) {
+    const errs = validarRecepcion(f, { formatoLote, hoy: hoyEcuador(), cerrando: estado === 'cerrado', loteExiste, loteCerrado: infoLote?.cerrado === true && !meta });
+    const hayErrores = ORDEN_CAMPOS.some((c) => errs[c]) || Boolean(errs.gavetas) || Boolean(errs.filas);
+    if (hayErrores) {
       setErrores(errs);
       setMensaje({ tipo: 'error', texto: 'Revisa los campos marcados en rojo.' });
       const primero = ORDEN_CAMPOS.find((c) => errs[c]);
       if (primero) document.getElementById(primero)?.focus();
+      else setTimeout(() => {
+        const el = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+        if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); }
+        else document.getElementById('seccion-gavetas')?.scrollIntoView({ block: 'start' });
+      }, 0);
       return;
     }
     setErrores({});
@@ -126,6 +152,9 @@ export default function FormularioRecepcion() {
       <>
         <h1>Recepción cerrada</h1>
         <Alerta tipo="exito">La recepción <strong>{cerrada.recepcion_id}</strong> se guardó y quedó cerrada.</Alerta>
+        {cerrada.lote_cerrado
+          ? <Alerta tipo="aviso">El lote <strong>{f.lote_id.trim().toUpperCase()}</strong> quedó <strong>cerrado</strong>: no admite más camiones.</Alerta>
+          : <p className="texto-suave">El lote <strong>{f.lote_id.trim().toUpperCase()}</strong> sigue <strong>abierto</strong>: puede llegar otro camión.</p>}
         <div className="acciones-fila">
           <button className="boton-primario" onClick={reiniciar}>Registrar otra recepción</button>
           <Link className="boton-secundario enlace-boton" to="/m01">Volver a Recepción</Link>
@@ -142,10 +171,11 @@ export default function FormularioRecepcion() {
         Control de pesos en recepción pesca crustáceos.
         {meta && <> Guardada como borrador: <strong>{meta.id}</strong>.</>}
       </p>
+      <NavSecciones errores={erroresPorSeccion(errores)} />
       {mensaje && <Alerta tipo={mensaje.tipo}>{mensaje.texto}</Alerta>}
       {errores.general && <Alerta tipo="aviso">{errores.general}</Alerta>}
 
-      <section className="tarjeta tarjeta-ancha" aria-labelledby="sec1">
+      <section className="tarjeta tarjeta-ancha" id="seccion-datos" aria-labelledby="sec1">
         <h2 id="sec1">1. Datos generales</h2>
         <div className="rejilla-form">
           <CampoTexto id="fecha_llegada" etiqueta="Fecha de llegada" tipo="date" obligatorio value={f.fecha_llegada}
@@ -163,8 +193,19 @@ export default function FormularioRecepcion() {
                       error={errores.piscina} maxLength={40} />
           <CampoTexto id="guia_remision" etiqueta="Guía de remisión" obligatorio value={f.guia_remision}
                       onChange={(v) => cambiar('guia_remision', v)} error={errores.guia_remision} maxLength={60} />
-          <CampoTexto id="num_gavetas_bines" etiqueta="N.º de gavetas o bines" obligatorio modo="numeric" value={f.num_gavetas_bines}
-                      onChange={(v) => cambiar('num_gavetas_bines', v.replace(/\D/g, ''))} error={errores.num_gavetas_bines} maxLength={4} />
+          <div className="campo" data-testid="grupo-llegada">
+            <p className="etiqueta-falsa" id="llegada_en-etiqueta">El producto llegó en</p>
+            <Conmutador idBase="llegada" ariaLabel="El producto llegó en bines o en gavetas" valor={f.llegada_en}
+                        opciones={[{ valor: 'bines', texto: 'Bines' }, { valor: 'gavetas', texto: 'Gavetas' }]}
+                        onChange={(v) => cambiar('llegada_en', v)} />
+          </div>
+          <div>
+            <CampoTexto id="num_gavetas_bines" etiqueta="N.º de gavetas o bines" obligatorio modo="numeric" value={f.num_gavetas_bines}
+                        onChange={(v) => cambiar('num_gavetas_bines', v.replace(/\D/g, ''))} error={errores.num_gavetas_bines} maxLength={4} />
+            {/^\d+$/.test(f.num_gavetas_bines) && Number(f.num_gavetas_bines) > 0 && (
+              <p className="leyenda-cantidad" data-testid="leyenda-cantidad" aria-live="polite">{textoCantidad(Number(f.num_gavetas_bines), f.llegada_en)}</p>
+            )}
+          </div>
           <PesoInput id="libras_reportadas" etiqueta="Libras reportadas" value={f.libras_reportadas}
                      onChange={(v) => cambiar('libras_reportadas', v)} error={errores.libras_reportadas} />
           <PesoInput id="libras_planta" etiqueta="Libras de planta" value={f.libras_planta}
@@ -178,12 +219,11 @@ export default function FormularioRecepcion() {
 
       <PanelCalculos f={f} />
 
-      <section className="tarjeta tarjeta-ancha tarjeta-pendiente" aria-labelledby="sec24">
-        <h2 id="sec24">2 a 4. Gavetas, temperaturas y almacenamiento</h2>
-        <p className="texto-suave">Estas secciones se activan en la Parte 7. Por ahora la recepción se guarda como borrador con los datos generales.</p>
-      </section>
+      <SeccionGavetas gavetas={f.gavetas} errores={errores} onCambiar={cambiarGaveta} />
+      <SeccionTemperaturas lecturas={f.temperaturas} gavetas={f.gavetas} errores={errores} onCambiar={cambiarLecturas} />
+      <SeccionAlmacenamiento filas={f.almacenamiento} errores={errores} onCambiar={cambiarAlmacenamiento} />
 
-      <section className="tarjeta tarjeta-ancha" aria-labelledby="sec5">
+      <section className="tarjeta tarjeta-ancha" id="seccion-cierre" aria-labelledby="sec5">
         <h2 id="sec5">5. Cierre</h2>
         <div className="rejilla-form">
           <Campo id="observacion" etiqueta="Observación" error={errores.observacion}>
@@ -191,6 +231,13 @@ export default function FormularioRecepcion() {
                       aria-invalid={Boolean(errores.observacion)} aria-describedby={errores.observacion ? 'observacion-error' : undefined}
                       onChange={(e) => cambiar('observacion', e.target.value)} />
           </Campo>
+          <div className="campo grupo-lote" data-testid="grupo-cerrar-lote">
+            <p className="etiqueta-falsa" id="cerrar_lote-etiqueta">¿Llegan más camiones con este lote?</p>
+            <Conmutador idBase="lote" ariaLabel="Estado del lote al guardar" valor={f.cerrar_lote ? 'cerrado' : 'abierto'}
+                        opciones={[{ valor: 'abierto', texto: 'Lote abierto' }, { valor: 'cerrado', texto: 'Cerrar lote' }]}
+                        onChange={(v) => cambiar('cerrar_lote', v === 'cerrado')} />
+            <p className="ayuda">Un lote cerrado ya no admite recepciones nuevas (un administrador puede reabrirlo). Un borrador nunca cierra el lote.</p>
+          </div>
           <Campo id="realizado_por" etiqueta="Realizado por">
             <input id="realizado_por" type="text" readOnly value={perfil?.nombre?.trim() || perfil?.correo || ''} />
           </Campo>

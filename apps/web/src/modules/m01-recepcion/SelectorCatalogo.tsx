@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Campo } from './controles';
 import { listarCatalogo } from './api';
-import { hayCoincidenciaExacta, normalizar, parecidos } from '../../lib/texto';
+import { completar, hayCoincidenciaExacta, nombreOficial, normalizar, parecidos } from '../../lib/texto';
 
 interface Props {
   id: string;
@@ -24,6 +24,15 @@ export default function SelectorCatalogo({ id, etiqueta, tipo, value, onChange, 
   const [nombres, setNombres] = useState<string[]>([]);
   const [consultado, setConsultado] = useState(false);
   const [sinRed, setSinRed] = useState(false);
+  const entrada = useRef<HTMLInputElement>(null);
+  const borrando = useRef(false);                 // si la última tecla fue Borrar, no se vuelve a completar
+  const seleccion = useRef<{ inicio: number; fin: number } | null>(null);
+
+  // Tras autocompletar, lo agregado queda seleccionado: seguir escribiendo lo reemplaza; Borrar lo quita.
+  useLayoutEffect(() => {
+    const s = seleccion.current;
+    if (s && entrada.current) { entrada.current.setSelectionRange(s.inicio, s.fin); seleccion.current = null; }
+  }, [value]);
 
   useEffect(() => {
     if (bloqueado) return;
@@ -34,14 +43,34 @@ export default function SelectorCatalogo({ id, etiqueta, tipo, value, onChange, 
       try {
         const r = await listarCatalogo(tipo, texto);
         if (!vigente) return;
-        setNombres(r.map((x) => x.nombre)); setConsultado(true); setSinRed(false);
+        const lista = r.map((x) => x.nombre);
+        setNombres(lista); setConsultado(true); setSinRed(false);
+        // Autocompletar: si lo escrito es el comienzo de un nombre existente, se completa (solo si el campo está en uso).
+        const completo = completar(texto, lista);
+        if (completo && !borrando.current && document.activeElement === entrada.current && entrada.current?.value.trim() === texto) {
+          seleccion.current = { inicio: entrada.current.value.length, fin: completo.length };
+          onChange(completo);
+        }
       } catch {
         if (!vigente) return;
         setNombres([]); setConsultado(false); setSinRed(true);
       }
     }, 250);
     return () => { vigente = false; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, tipo, bloqueado]);
+
+  // Al salir del campo, si coincide con un nombre existente (aunque cambien mayúsculas o tildes) se usa su escritura oficial.
+  const aplicarNombreOficial = async () => {
+    const escrito = value.trim();
+    if (bloqueado || escrito.length < 2) return;
+    let lista = nombres;
+    if (!nombreOficial(escrito, lista)) {
+      try { lista = (await listarCatalogo(tipo, escrito)).map((x) => x.nombre); } catch { return; }
+    }
+    const oficial = nombreOficial(escrito, lista);
+    if (oficial && oficial !== value) onChange(oficial);
+  };
 
   const texto = value.trim();
   const exacto = hayCoincidenciaExacta(texto, nombres);
@@ -53,9 +82,11 @@ export default function SelectorCatalogo({ id, etiqueta, tipo, value, onChange, 
     <Campo id={id} etiqueta={etiqueta} error={error} obligatorio={obligatorio}
            ayuda={bloqueado ? ayudaBloqueado : undefined}>
       <input
-        id={id} type="text" value={value} disabled={bloqueado} autoComplete="off"
+        id={id} ref={entrada} type="text" value={value} disabled={bloqueado} autoComplete="off"
         aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} aria-required={obligatorio}
+        onKeyDown={(e) => { borrando.current = e.key === 'Backspace' || e.key === 'Delete'; }}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={() => void aplicarNombreOficial()}
       />
       {!bloqueado && texto.length >= 2 && (
         <div className="catalogo-estado" aria-live="polite">

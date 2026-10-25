@@ -49,10 +49,14 @@ interface PesoInputProps {
   error?: string;
   placeholder?: string;
   compacto?: boolean;
+  /** Nombre para lectores de pantalla cuando no hay etiqueta visible (por ejemplo, las casillas de gavetas). */
+  etiquetaAria?: string;
+  /** Se ejecuta al presionar Enter (por ejemplo, para pasar a la siguiente casilla). */
+  alEnter?: () => void;
 }
 
 /** Campo de peso: la persona escribe en la unidad elegida y el valor se guarda en libras. */
-export function PesoInput({ id, value, onChange, etiqueta, error, placeholder, compacto }: PesoInputProps) {
+export function PesoInput({ id, value, onChange, etiqueta, error, placeholder, compacto, etiquetaAria, alEnter }: PesoInputProps) {
   const { unidad, aMostrar, aLibras } = useUnidad();
   const formatear = (lb: number | null) => {
     const v = aMostrar(lb);
@@ -78,7 +82,8 @@ export function PesoInput({ id, value, onChange, etiqueta, error, placeholder, c
     <div className={compacto ? 'campo campo-compacto' : 'campo'}>
       {etiqueta && <label htmlFor={id}>{etiqueta} <span className="unidad-etiqueta">({unidad})</span></label>}
       <input
-        id={id} type="text" inputMode="decimal" autoComplete="off" value={texto} placeholder={placeholder}
+        id={id} type="text" inputMode="decimal" autoComplete="off" value={texto} placeholder={placeholder} aria-label={etiqueta ? undefined : etiquetaAria}
+        onKeyDown={(e) => { if (e.key === 'Enter' && alEnter) { e.preventDefault(); alEnter(); } }}
         aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
         onFocus={() => { enfocado.current = true; }}
         onBlur={() => { enfocado.current = false; setTexto(formatear(value)); }}

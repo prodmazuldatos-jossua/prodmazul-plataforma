@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { Vacio } from './ui';
+import { etiquetaModulo } from '../lib/texto';
 
 export default function Inicio() {
   const { perfil } = useAuth();
@@ -18,7 +19,7 @@ export default function Inicio() {
         <div className="rejilla-modulos">
           {modulos.map((m) => (
             <Link key={m.modulo_id} to={m.ruta} className="tarjeta-modulo">
-              <span className="modulo-codigo">{m.modulo_id}</span>
+              <span className="modulo-codigo">{etiquetaModulo(m.modulo_id)}</span>
               <span className="modulo-nombre">{m.nombre}</span>
             </Link>
           ))}

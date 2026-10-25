@@ -1,4 +1,4 @@
-﻿# Prodmazul · Fase 4 · Parte 4 · Prueba de la API como la usará la aplicación (con inicio de sesión real)
+# Prodmazul · Fase 4 · Parte 4 · Prueba de la API como la usará la aplicación (con inicio de sesión real)
 # Qué hace: inicia sesión con un usuario OPERATIVO, guarda una recepción de prueba, la reenvía, la consulta, la lista,
 # la edita y comprueba que la API rechace lo incorrecto. Te pide los datos al ejecutarla: nada queda escrito en el archivo.
 # La recepción de prueba queda guardada: bórrala después con docs\limpiar_recepcion.sql (la guía que usó se muestra al final).
@@ -22,7 +22,7 @@ function Resultado($nombre, $condicion, $detalle = '') {
   if ($condicion) { $script:bien++; Write-Host "  OK     $nombre" -ForegroundColor Green }
   else            { $script:mal++;  Write-Host "  FALLO  $nombre  $detalle" -ForegroundColor Red }
 }
-function Json($obj) { $b = [Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json -Depth 10 -Compress)); return , $b }
+function Json($obj) { return [Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json -Depth 10 -Compress)) }
 
 # Llama a una función de la API. Devuelve @{ ok = $true; datos = ... } o @{ ok = $false; mensaje = 'E_XXX|texto' }
 function Llamar($funcion, $cuerpo, $token) {
@@ -32,9 +32,6 @@ function Llamar($funcion, $cuerpo, $token) {
     return @{ ok = $true; datos = $r }
   } catch {
     $m = $_.ErrorDetails.Message
-    if (-not $m -and $_.Exception.Response) {
-      try { $m = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch {}
-    }
     try { $m = ($m | ConvertFrom-Json).message } catch {}
     return @{ ok = $false; mensaje = [string]$m }
   }
@@ -46,13 +43,7 @@ try {
   $login = Invoke-RestMethod -Method Post -Uri "$url/auth/v1/token?grant_type=password" -Headers @{ apikey = $anon } -ContentType 'application/json' -Body (Json @{ email = $correo; password = $clave })
   $token = $login.access_token
 } catch {
-  $detalle = $_.ErrorDetails.Message
-  if (-not $detalle -and $_.Exception.Response) {
-    try { $detalle = (New-Object IO.StreamReader($_.Exception.Response.GetResponseStream())).ReadToEnd() } catch {}
-  }
-  if (-not $detalle) { $detalle = $_.Exception.Message }
-  Write-Host '  No se pudo iniciar sesión. Respuesta del servidor (sin datos secretos):' -ForegroundColor Red
-  Write-Host "  $detalle" -ForegroundColor Yellow
+  Write-Host '  No se pudo iniciar sesión. Revisa URL, clave anon, correo y contraseña.' -ForegroundColor Red
   exit 1
 }
 $clave = $null
@@ -67,7 +58,7 @@ $datos = @{
   guia_remision = $guia; num_gavetas_bines = 2; libras_reportadas = 500; libras_planta = 495
   hora_inicio_descarga = '08:00'; hora_fin_descarga = '08:45'
   gavetas = @(@{ num_gaveta = 1; peso_lb = 240 }, @{ num_gaveta = 2; peso_lb = 255 })
-  temperaturas = @(@{ lectura_id = 1; bines = 'B1'; temperatura_c = 2.5 })
+  temperaturas = @(@{ lectura_id = 1; num_gaveta = 1; temperatura_c = 2.5 })
   almacenamiento = @(@{ num_bin = 'B1'; sellos_recepcion = 'S1'; sellos_almacenamiento = 'A1'; temperatura_c = 2.5; libras_aprox = 495 })
 }
 

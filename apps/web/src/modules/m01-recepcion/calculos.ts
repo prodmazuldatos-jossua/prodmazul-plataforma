@@ -43,3 +43,22 @@ export function pesoPromedio(pesos: number[]): number | null {
   if (pesos.length === 0) return null;
   return redondear(pesos.reduce((s, p) => s + p, 0) / pesos.length);
 }
+
+/** Pesos escritos en las casillas de gavetas (se ignoran las vacías). */
+export function pesosPresentes(gavetas: (number | null)[]): number[] {
+  return gavetas.filter((g): g is number => g !== null);
+}
+
+/** Promedio de un bloque de 10 gavetas (bloque 0 = gavetas 1 a 10, 1 = 11 a 20, 2 = 21 a 30). */
+export function promedioBloque(gavetas: (number | null)[], bloque: number): number | null {
+  return pesoPromedio(pesosPresentes(gavetas.slice(bloque * 10, bloque * 10 + 10)));
+}
+
+export function totalPesos(gavetas: (number | null)[]): number {
+  return redondear(pesosPresentes(gavetas).reduce((s, p) => s + p, 0));
+}
+
+/** Suma de las libras aproximadas de las filas de almacenamiento. */
+export function totalLibrasAprox(filas: { libras_aprox: number | null }[]): number {
+  return redondear(filas.reduce((s, f) => s + (f.libras_aprox ?? 0), 0));
+}
