@@ -1,11 +1,7 @@
-Prodmazul - Fase 4 - Parte 10: Modo sin conexion.
-
-Contenido:
-  apps/web/src/offline/        Cola local de pendientes (IndexedDB), envio automatico, contador y pruebas.
-  apps/web/src/modules/...     Formulario que guarda sin senal, pantallas Pendientes y Corregir, botones sin senal.
-  apps/web/src/core/...        Encabezado con contador de pendientes y aviso al cerrar sesion.
-  apps/web/src/lib/...         Un tiempo de espera agotado se trata como falta de conexion.
-  docs/                        prueba_parte10.sql (prueba dentro de tu proyecto de Supabase).
-
-No hay migracion nueva: la base de datos queda igual (11 migraciones).
-Copiar sobre el repositorio con Copy-Item ... -Recurse -Force (ver la guia, paso 2).
+Fase 4 - Parte 11: PDF de la recepción
+Archivos nuevos:   apps/web/src/modules/m01-recepcion/pdf.ts, pdf.test.ts, pdfDescarga.ts
+Archivo cambiado:  apps/web/src/modules/m01-recepcion/DetalleRecepcion.tsx (botón «PDF»)
+NO incluye package.json: instala la librería con
+    cd apps/web
+    npm install pdf-lib@1.17.1 --save-exact
+No hay cambios en Supabase (no hay migración nueva).

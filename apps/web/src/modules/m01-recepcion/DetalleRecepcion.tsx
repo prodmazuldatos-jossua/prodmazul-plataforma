@@ -6,6 +6,7 @@ import { aApiError, mensajeDe } from '../../lib/errores';
 import { formatoFecha, formatoFechaHora, formatoHora } from '../../lib/fechas';
 import { textoCantidad } from '../../lib/texto';
 import { useUnidad } from '../../lib/unidades';
+import { descargarPdfRecepcion } from './pdfDescarga';
 import { useOnline } from '../../lib/conexion';
 import { anularRecepcion, eliminarRecepcion, obtenerRecepcion, reactivarRecepcion } from './api';
 import { pesoPromedio, redondear } from './calculos';
@@ -34,7 +35,9 @@ export default function DetalleRecepcion() {
   const { state } = useLocation() as { state: { aviso?: string } | null };
   const { perfil, puede } = useAuth();
   const online = useOnline();
-  const { texto: peso } = useUnidad();
+  const { texto: peso, unidad } = useUnidad();
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [errorPdf, setErrorPdf] = useState<string | null>(null);
   const [r, setR] = useState<RecepcionDetalle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -52,6 +55,20 @@ export default function DetalleRecepcion() {
   useEffect(() => { void cargar(); }, [cargar]);
 
   const cerrarModal = useCallback(() => { setAccion(null); setMotivo(''); setErrorMotivo(null); setFalloAccion(null); }, []);
+
+  async function generarPdf() {
+    if (!r) return;
+    setGenerandoPdf(true);
+    setErrorPdf(null);
+    try {
+      const nombre = await descargarPdfRecepcion(r, unidad, perfil?.nombre);
+      setAviso(`PDF generado: ${nombre} (pesos en ${unidad === 'kg' ? 'kilogramos' : 'libras'}).`);
+    } catch {
+      setErrorPdf('No se pudo generar el PDF. Cierra y abre la recepción e inténtalo de nuevo.');
+    } finally {
+      setGenerandoPdf(false);
+    }
+  }
 
   if (cargando && !r) return <Cargando texto="Cargando la recepción…" />;
   if (error || !r) {
@@ -115,6 +132,9 @@ export default function DetalleRecepcion() {
           <h1>Recepción {r.recepcion_id} <InsigniaEstado estado={r.estado} /></h1>
         </div>
         <div className="acciones-fila acciones-detalle">
+          <button type="button" className="boton-secundario" data-testid="boton-pdf" disabled={generandoPdf} onClick={generarPdf}>
+            {generandoPdf ? 'Generando PDF…' : 'PDF'}
+          </button>
           {cap.editar && (online
             ? <Link className="boton-primario enlace-boton" to={`/m01/${r.recepcion_id}/editar`}>Editar</Link>
             : <button type="button" className="boton-primario" disabled>Editar</button>)}
@@ -128,6 +148,7 @@ export default function DetalleRecepcion() {
       )}
 
       {aviso && <Alerta tipo="exito">{aviso}</Alerta>}
+      {errorPdf && <Alerta tipo="error">{errorPdf}</Alerta>}
       {r.estado === 'anulado' && (
         <Alerta tipo="aviso">
           <strong>Recepción anulada</strong>{r.anulado_en ? ` el ${formatoFechaHora(r.anulado_en)}` : ''}. Motivo: {r.motivo_anulacion ?? '—'}
