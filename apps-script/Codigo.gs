@@ -1,5 +1,5 @@
 /**
- * Prodmazul · Receptor de Google (Apps Script) · versión 2.1 · Fase 5 · Partes 2 y 4
+ * Prodmazul · Receptor de Google (Apps Script) · versión 2.2 · Fase 5 · Partes 2, 4 y 5
  *
  * Qué hace:
  *   - Recibe lotes de cambios desde Supabase y los escribe en el libro del año «Prodmazul_Respaldo_AAAA»
@@ -14,6 +14,8 @@
  * Propiedades de la secuencia de comandos (Configuración del proyecto):
  *   TOKEN      token secreto de 40 caracteres            (ya existe)
  *   SHEET_ID   ID del libro «Prodmazul_Respaldo_2026»    (ya existe)
+ *   - (Parte 5) Antes de borrar una foto de Supabase, comprueba que su copia siga en Drive (no en la papelera,
+ *     con el mismo tamaño y la misma ruta anotada en su descripción).
  *   FOLDER_ID  ID de la carpeta de fotos                 (ya existe; la Parte 4 guarda aquí las fotos)
  *   LIBRO_AAAA ID de cada libro del año                  (las crea el propio script)
  *
@@ -21,7 +23,7 @@
  * identificador «Sheets». Se usa para escribir los valores tal cual (RAW): un texto como «001» o «=1+1»
  * NO se convierte en número ni en fórmula.
  */
-const VERSION = '2.1';
+const VERSION = '2.2';
 const PROPS = PropertiesService.getScriptProperties();
 const ZONA = 'America/Guayaquil';
 const MAX_FILAS_LOTE = 2000;     // filas (cambios + borrados) por lote
@@ -75,6 +77,9 @@ function doPost(e) {
 
       case 'contar_fotos':
         return salida(contarFotos(body));
+
+      case 'verificar_fotos':
+        return salida(verificarFotos(body));
 
       // Pruebas de la Fase 3 (se conservan)
       case 'prueba_hoja': {
@@ -523,6 +528,35 @@ function guardarFotos(body) {
     if (Date.now() - inicio > LIMITE_FOTOS_MS) return { foto_id: f.foto_id, ok: false, pendiente: true, error: 'No alcanzo el tiempo; se reintentara.' };
     try { return respaldarFoto(raiz, f); }
     catch (err) { return { foto_id: f.foto_id, ok: false, error: String(err && err.message ? err.message : err).slice(0, 300) }; }
+  });
+  return { ok: true, resultados: resultados, version: VERSION };
+}
+
+// (Parte 5) ¿Siguen en Drive las copias? SOLO LEE: no crea, mueve ni borra nada.
+// Para cada foto comprueba: el archivo existe, no está en la papelera, pesa lo esperado y su descripción es la ruta de la foto.
+const MAX_VERIFICAR = 100;
+const RE_DRIVE_ID = /^[A-Za-z0-9_-]{10,100}$/;
+function verificarFotos(body) {
+  const lista = body.fotos;
+  if (!Array.isArray(lista) || lista.length < 1 || lista.length > MAX_VERIFICAR) throw new ErrorSolicitud('fotos no valido (de 1 a ' + MAX_VERIFICAR + ')');
+  lista.forEach(function (f) {
+    if (!f || typeof f.foto_id !== 'string' || !RE_FOTO_ID.test(f.foto_id)) throw new ErrorSolicitud('foto_id no valido');
+    if (typeof f.drive_file_id !== 'string' || !RE_DRIVE_ID.test(f.drive_file_id)) throw new ErrorSolicitud('drive_file_id no valido en ' + f.foto_id);
+    if (typeof f.ruta !== 'string' || f.ruta.length < 5 || f.ruta.length > 300) throw new ErrorSolicitud('ruta no valida en ' + f.foto_id);
+    if (typeof f.bytes_esperados !== 'number' || !(f.bytes_esperados >= 1) || f.bytes_esperados > MAX_BYTES_FOTO) throw new ErrorSolicitud('bytes_esperados no valido en ' + f.foto_id);
+  });
+  const inicio = Date.now();
+  const resultados = lista.map(function (f) {
+    if (Date.now() - inicio > LIMITE_FOTOS_MS) return { foto_id: f.foto_id, ok: false, pendiente: true, error: 'No alcanzo el tiempo; se reintentara.' };
+    try {
+      const a = DriveApp.getFileById(f.drive_file_id);
+      if (a.isTrashed()) return { foto_id: f.foto_id, ok: false, error: 'El archivo esta en la papelera de Drive.' };
+      if (a.getSize() !== f.bytes_esperados) return { foto_id: f.foto_id, ok: false, error: 'El archivo de Drive pesa ' + a.getSize() + ' bytes y se esperaban ' + f.bytes_esperados + '.' };
+      if (a.getDescription() !== f.ruta) return { foto_id: f.foto_id, ok: false, error: 'El archivo de Drive no corresponde a esta foto (la descripcion no coincide).' };
+      return { foto_id: f.foto_id, ok: true, bytes: a.getSize() };
+    } catch (err) {
+      return { foto_id: f.foto_id, ok: false, error: 'No se pudo abrir el archivo en Drive.' };
+    }
   });
   return { ok: true, resultados: resultados, version: VERSION };
 }

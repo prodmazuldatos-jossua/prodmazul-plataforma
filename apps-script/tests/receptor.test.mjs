@@ -25,7 +25,7 @@ console.log('\nEntrada y token');
 {
   const R = nuevo();
   const p = R.llamar({ token: TOKEN, accion: 'ping' });
-  t('ping responde ok con la versión', p.ok === true && p.version === '2.1');
+  t('ping responde ok con la versión', p.ok === true && p.version === '2.2');
   t('token incorrecto: no autorizado', R.llamar({ token: 'falso', accion: 'ping' }).error === 'no autorizado');
   t('token de otro largo: no autorizado', R.llamar({ token: TOKEN + 'x', accion: 'ping' }).error === 'no autorizado');
   t('sin token: no autorizado', R.llamar({ accion: 'ping' }).error === 'no autorizado');
@@ -345,6 +345,47 @@ console.log('\nFotos en Drive (Parte 4)');
   t('el estado informa la carpeta de fotos y que es privada', es.fotos.configurada === true && es.fotos.privada === true && es.fotos.carpeta === 'Prodmazul_Respaldo_Fotos');
   R.raizFotos.acceso = 'ANYONE';
   t('y avisa si deja de ser privada', R.llamar({ token: TOKEN, accion: 'estado' }).fotos.privada === false);
+  t('el candado se libera siempre', R.locks.tomados === R.locks.liberados);
+}
+
+console.log('\nVerificar copias antes de purgar (Parte 5)');
+{
+  const jpg = (n) => { const b = Buffer.alloc(n, 7); b[0] = 0xFF; b[1] = 0xD8; b[2] = 0xFF; return b; };
+  const REC = 'REC-20260801-0001';
+  const urlDe = (ruta) => `https://abcd1234.supabase.co/storage/v1/object/sign/m01-recepcion-fotos/${ruta}?token=eyJ.abc_x-y`;
+  const R = nuevo();
+  R.red = () => ({ codigo: 200, bytes: jpg(1500) });
+  const ruta = 'M01/x/' + REC + '/a.jpg', fid = `FOT-M01-995-995-995-${REC}-01`;
+  const g = R.llamar({ token: TOKEN, accion: 'guardar_fotos', fotos: [{ foto_id: fid, recepcion_id: REC, nn: 1, ruta, tipo_mime: 'image/jpeg', url: urlDe(ruta), bytes_esperados: 1500 }] });
+  const did = g.resultados[0].drive_file_id;
+  const V = (fotos) => R.llamar({ token: TOKEN, accion: 'verificar_fotos', fotos });
+  const ok1 = { foto_id: fid, drive_file_id: did, ruta, bytes_esperados: 1500 };
+  const archivo = () => R.filesDrive[did];
+  let r = V([ok1]);
+  t('una copia intacta se verifica', r.ok && r.resultados[0].ok === true && r.resultados[0].bytes === 1500, JSON.stringify(r));
+  r = V([{ ...ok1, bytes_esperados: 1501 }]);
+  t('si el tamaño no coincide, NO se verifica', r.resultados[0].ok === false && /pesa 1500/.test(r.resultados[0].error));
+  r = V([{ ...ok1, ruta: 'M01/x/otra.jpg' }]);
+  t('si la descripción (ruta) no coincide, NO se verifica', r.resultados[0].ok === false && /no corresponde/.test(r.resultados[0].error));
+  r = V([{ ...ok1, drive_file_id: 'IDQUENOEXISTE12345' }]);
+  t('si el archivo no existe, NO se verifica (sin error grave)', r.ok && r.resultados[0].ok === false && /No se pudo abrir/.test(r.resultados[0].error));
+  archivo().papelera = true;
+  r = V([ok1]);
+  t('si el archivo está en la papelera, NO se verifica', r.resultados[0].ok === false && /papelera/.test(r.resultados[0].error));
+  archivo().papelera = false;
+  const lote = V([ok1, { ...ok1, bytes_esperados: 9 }, ok1]);
+  t('cada foto lleva su propio resultado', lote.resultados.map((x) => x.ok).join() === 'true,false,true');
+  const antes = JSON.stringify(Object.values(R.filesDrive).map((a) => [a.nombre, a.papelera, a.desc, a.bytes.length]));
+  V([ok1]);
+  t('solo lee: no cambia nada en Drive', antes === JSON.stringify(Object.values(R.filesDrive).map((a) => [a.nombre, a.papelera, a.desc, a.bytes.length])));
+  const malos = { 'sin lista': undefined, 'lista vacía': [], 'más de 100': Array.from({ length: 101 }, () => ok1),
+    'foto_id inválido': [{ ...ok1, foto_id: 'x' }], 'drive_file_id inválido': [{ ...ok1, drive_file_id: 'a b' }], 'id corto': [{ ...ok1, drive_file_id: 'abc' }],
+    'ruta vacía': [{ ...ok1, ruta: '' }], 'bytes cero': [{ ...ok1, bytes_esperados: 0 }], 'bytes texto': [{ ...ok1, bytes_esperados: '1500' }], 'bytes enormes': [{ ...ok1, bytes_esperados: 99999999 }] };
+  let todos = true, det = '';
+  for (const [n, l] of Object.entries(malos)) { const x = V(l); if (!(x.ok === false && x.tipo === 'solicitud')) { todos = false; det += n + ' '; } }
+  t('10 solicitudes mal formadas se rechazan', todos, det);
+  t('token incorrecto: no autorizado', R.llamar({ token: 'x', accion: 'verificar_fotos', fotos: [ok1] }).error === 'no autorizado');
+  t('funciona aunque la carpeta sea pública (solo lee)', (() => { R.raizFotos.acceso = 'ANYONE'; const x = V([ok1]); R.raizFotos.acceso = 'PRIVATE'; return x.resultados[0].ok === true; })());
   t('el candado se libera siempre', R.locks.tomados === R.locks.liberados);
 }
 

@@ -119,10 +119,10 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
   } };
 
   // ---- Drive: carpetas y archivos (para las fotos)
-  R.carpetas = {};
+  R.carpetas = {}; R.filesDrive = {};
   const iter = (lista) => { let i = 0; return { hasNext: () => i < lista.length, next: () => lista[i++] }; };
   class ArchivoDrive {
-    constructor(carpeta, nombre, mime, bytes) { this.id = nuevoId(); this.nombre = nombre; this.mime = mime; this.bytes = Buffer.from(bytes); this.desc = ''; this.papelera = false; this.carpeta = carpeta; }
+    constructor(carpeta, nombre, mime, bytes) { this.id = nuevoId(); this.nombre = nombre; this.mime = mime; this.bytes = Buffer.from(bytes); this.desc = ''; this.papelera = false; this.carpeta = carpeta; R.filesDrive[this.id] = this; }
     getId() { return this.id; } getName() { return this.nombre; } setName(n) { this.nombre = n; return this; }
     getDescription() { return this.desc; } setDescription(d) { this.desc = d; return this; }
     getSize() { return this.bytes.length; } isTrashed() { return this.papelera; } setTrashed(b) { this.papelera = b; return this; }
@@ -176,7 +176,7 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
     DriveApp: {
       Access: { PRIVATE: 'PRIVATE', ANYONE: 'ANYONE', ANYONE_WITH_LINK: 'ANYONE_WITH_LINK', DOMAIN: 'DOMAIN', DOMAIN_WITH_LINK: 'DOMAIN_WITH_LINK' },
       getFolderById: (id) => { const c = R.carpetas[id]; if (!c) throw new Error('No item with the given ID could be found'); return c; },
-      getFileById: (id) => { const l = R.archivos[id]; if (!l) throw new Error('No item with the given ID could be found'); return archivoDrive(l); },
+      getFileById: (id) => { if (R.filesDrive[id]) return R.filesDrive[id]; const l = R.archivos[id]; if (!l) throw new Error('No item with the given ID could be found'); return archivoDrive(l); },
       getFilesByName: (n) => { const l = Object.values(R.archivos).filter((x) => x.nombre === n); let i = 0; return { hasNext: () => i < l.length, next: () => archivoDrive(l[i++]) }; }
     },
     Sheets

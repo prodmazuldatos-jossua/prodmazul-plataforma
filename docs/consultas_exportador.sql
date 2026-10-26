@@ -1,4 +1,4 @@
--- Prodmazul · Fase 5 · Partes 3 y 4 · Consultas del exportador (datos y fotos) (Supabase > SQL Editor)
+-- Prodmazul · Fase 5 · Partes 3, 4 y 5 · Consultas del exportador (datos, fotos y retención) (Supabase > SQL Editor)
 -- Copia y ejecuta UNA consulta a la vez. Solo las que dicen «MODIFICA» cambian algo; las demás solo leen.
 -- NUNCA ejecutes «select * from vault.decrypted_secrets»: mostraría los secretos en pantalla.
 
@@ -114,3 +114,56 @@ from m01_recepcion.fotos_meta where purgada_supabase_en is null;
 -- 25) MODIFICA: repetir el respaldo de UNA foto (por ejemplo, si la borraron de Drive por error). Cambia el identificador.
 --     Si el archivo sigue en Drive, el receptor lo reutiliza y no crea otro.
 -- select core.sync_fotos_olvidar('FOT-M01-...-...-01');
+
+-- ================================================================ PARTE 5 · RETENCIÓN DE 60 DÍAS
+-- 26) ¿Está encendida la purga, cuántos días es la retención y está programada la tarea diaria?
+select (select valor from core.config where clave = 'purga_activa')          as purga_activa,
+       (select valor from core.config where clave = 'dias_retencion_fotos')  as dias_retencion,
+       (select valor from core.config where clave = 'purga_gracia_horas')    as gracia_horas,
+       (select schedule from cron.job where jobname = 'prodmazul-purga-fotos') as programacion_utc;
+
+-- 27) Las últimas corridas de la purga (la más reciente arriba)
+select purga_id, origen, estado, candidatas, purgadas, omitidas, errores, quedan,
+       to_char(pedida_en at time zone 'America/Guayaquil', 'DD/MM HH24:MI:SS') as pedida_ecuador, error
+from core.purga_ejecuciones order by purga_id desc limit 15;
+
+-- 28) VISTA PREVIA: qué fotos se purgarían en la próxima corrida (NO borra nada)
+select f.foto_id, f.recepcion_id, f.nn, f.tamano_bytes,
+       to_char(f.subido_en at time zone 'America/Guayaquil', 'DD/MM/YYYY') as subida,
+       to_char(f.respaldo_drive_en at time zone 'America/Guayaquil', 'DD/MM/YYYY HH24:MI') as copia_en_drive
+from m01_recepcion.fotos_meta f left join core.purga_fotos p on p.foto_id = f.foto_id
+where core.purga_regla(f) and coalesce(p.intentos, 0) < 5
+order by f.subido_en limit 100;
+
+-- 29) Fotos archivadas (ya no están en Supabase; solo en Drive), por mes de llegada de la recepción
+select to_char(r.fecha_llegada, 'YYYY-MM') as mes, count(*) as fotos_archivadas
+from m01_recepcion.fotos_meta f join m01_recepcion.recepciones r using (recepcion_id)
+where f.purgada_supabase_en is not null group by 1 order by 1 desc;
+
+-- 30) Fotos con problemas en la purga (con su motivo y cuándo se reintentan)
+select p.foto_id, p.intentos, p.ultimo_error, p.proximo_intento_en,
+       case when p.intentos >= 5 then 'AGOTADA' else 'se reintentará' end as situacion
+from core.purga_fotos p order by p.actualizado_en desc;
+
+-- 31) Resumen de fotos por situación: en Supabase y con copia / en Supabase sin copia / archivadas en Drive
+select count(*) filter (where purgada_supabase_en is null and drive_file_id is not null) as en_supabase_con_copia,
+       count(*) filter (where purgada_supabase_en is null and drive_file_id is null and confirmada) as en_supabase_sin_copia,
+       count(*) filter (where purgada_supabase_en is not null) as archivadas_en_drive
+from m01_recepcion.fotos_meta;
+
+-- 32) MODIFICA: encender la purga y programar la tarea diaria (03:30 hora de Ecuador). Necesita los secretos de Vault.
+-- select core.purga_programar();
+
+-- 33) MODIFICA: apagar la purga (quita la tarea; no borra nada)
+-- select core.purga_pausar();
+
+-- 34) MODIFICA: pedir una corrida ahora (después de ~40 segundos ejecuta la consulta 27)
+-- select core.purga_disparar('manual');
+
+-- 35) MODIFICA: devolver a la cola las fotos con error de purga (después de corregir la causa)
+-- update core.purga_fotos set intentos = 0, proximo_intento_en = null;
+
+-- 36) MODIFICA SOLO PARA PRUEBAS: envejecer UNA foto de prueba para que la purga la considere (cambia el identificador).
+--     Nunca lo uses con fotos reales.
+-- update m01_recepcion.fotos_meta set subido_en = now() - interval '70 days', respaldo_drive_en = now() - interval '2 days'
+--  where foto_id = 'FOT-M01-...-...-01' and drive_file_id is not null;

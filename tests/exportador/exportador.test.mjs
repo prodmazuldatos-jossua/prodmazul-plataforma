@@ -1,4 +1,4 @@
-// Pruebas del exportador (Fase 5 · Partes 3 y 4): base de datos real simulada (PGlite, con las migraciones 1 a 15)
+// Pruebas del exportador (Fase 5 · Partes 3, 4 y 5): base de datos real simulada (PGlite, con las migraciones 1 a 16)
 // + la lógica de la función sync-exportar + el receptor de Google (Codigo.gs) en su simulación.
 // Ejecutar:  node --import ./registrar.mjs exportador.test.mjs
 import { PGlite } from '@electric-sql/pglite';
@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { crearEntorno } from '../../apps-script/tests/mock_google.mjs';
-import { ejecutar, limpiar, mismoSecreto, configuracionGoogle, probarGoogle } from '../../supabase/functions/sync-exportar/nucleo.ts';
+import { ejecutar, purgar, limpiar, mismoSecreto, configuracionGoogle, probarGoogle } from '../../supabase/functions/sync-exportar/nucleo.ts';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const dirMig = path.resolve(aqui, '../../supabase/migrations');
@@ -358,7 +358,7 @@ console.log('\nExportador · configuración incompleta y ejecuciones simultánea
   t('los lotes de las dos ejecuciones suman lo enviado', G.lotes.length - llamadasAntes === a.lotes + b.lotes);
 
   const p = await probarGoogle(deps());
-  t('la prueba de conexión (ping) devuelve la versión del receptor', p.ok === true && p.version === '2.1', JSON.stringify(p));
+  t('la prueba de conexión (ping) devuelve la versión del receptor', p.ok === true && p.version === '2.2', JSON.stringify(p));
   entorno = { ...guardado, APPS_SCRIPT_TOKEN: 'X'.repeat(40) };
   const p2 = await probarGoogle(deps());
   t('el ping con token malo informa «no autorizado»', p2.ok === false && /no autorizado/.test(p2.error));
@@ -544,6 +544,226 @@ console.log('\nRespaldo de fotos en Drive (Parte 4)');
   t('la siguiente ejecución la retoma', r.fotos === 1);
   r = await ejecutar(dd());
   t('la cola de datos y la de fotos terminan vacías', (await cola('pendiente')) === 0 && Number(await uno(`select count(*) from core.sync_fotos`)) === 0);
+}
+
+// ---------------------------------------------------------------- 9) retención de fotos (Parte 5)
+console.log('\nRetención de 60 días (Parte 5)');
+{
+  await limpiarCola();
+  G = nuevoGoogle();
+  const jpg = (n, sem = 7) => { const b = Buffer.alloc(n, sem); b[0] = 0xFF; b[1] = 0xD8; b[2] = 0xFF; b[3] = 0xE0; return b; };
+  G.red = () => ({ codigo: 200, bytes: jpg(1200) });
+  const firmar = async (ruta) => ({ url: `https://abcd1234.supabase.co/storage/v1/object/sign/m01-recepcion-fotos/${ruta}?token=eyJhbGciOi.JIUzI1NiIs_x-y` });
+  let borradas = []; let falloBorrar = null;
+  const borrar = async (rutas) => {
+    if (falloBorrar) return { error: falloBorrar };
+    borradas.push(...rutas);
+    for (const r of rutas) await db.query(`delete from storage.objects where name = $1`, [r]);
+    return {};
+  };
+  const dd = (extra = {}) => deps({ firmar, borrar, ...extra });
+  const hoy = new Date().toISOString().slice(0, 10);
+  let n = 0;
+  const nuevaRec = async () => {
+    n++;
+    const rec = { estado: 'cerrado', fecha_llegada: hoy, lote_id: '995-995-995', proveedor: 'PROVEEDOR 1', especie: 'LANGOSTINO', num_gavetas_bines: 1, libras_reportadas: 100, libras_planta: 99, guia_remision: 'G-F5-' + n,
+      gavetas: [{ num_gaveta: 1, peso_lb: 99 }], client_uuid: `6666666${n % 10}-6666-4666-8666-66666666666${n % 10}`.replace(/(.{8})-(.{4})-(.{4})-(.{4})-(.*)/, '$1-$2-$3-$4-$5').slice(0, 36) };
+    rec.client_uuid = `66666666-6666-4666-8666-${String(100000000000 + n)}`;
+    const g = await comoUsuario(ADMIN, `select public.api_m01_guardar_recepcion('${JSON.stringify(rec)}'::jsonb)`);
+    return g.data.recepcion_id;
+  };
+  let cr = 0;
+  const foto = async (rid, nn, { dias = 70, respaldo = true, horasRespaldo = 48, bytes = 1200 } = {}) => {
+    const fid = `FOT-M01-995-995-995-${rid}-${String(nn).padStart(2, '0')}`; const ruta = `M01/995-995-995/${rid}/${fid}-ab${++cr}.jpg`;
+    await db.query(`insert into m01_recepcion.fotos_meta (foto_id, recepcion_id, lote_id, nn, ruta, nombre, tipo_mime, tamano_bytes, confirmada, subido_en)
+                    values ($1,$2,'995-995-995',$3,$4,'f.jpg','image/jpeg',$5,true, now() - make_interval(days => $6))`, [fid, rid, nn, ruta, bytes, dias]);
+    await db.query(`insert into storage.objects (bucket_id, name, metadata) values ('m01-recepcion-fotos', $1, $2)`, [ruta, JSON.stringify({ size: bytes })]);
+    if (respaldo) {
+      await ejecutar(dd(), { max_lotes: 0 });                       // respalda de verdad en el Drive simulado
+      await db.query(`update m01_recepcion.fotos_meta set respaldo_drive_en = now() - make_interval(hours => $2) where foto_id = $1`, [fid, horasRespaldo]);
+    }
+    return { fid, ruta };
+  };
+  const fila = async (fid) => (await q(`select drive_file_id, respaldo_drive_en, purgada_supabase_en from m01_recepcion.fotos_meta where foto_id = $1`, [fid]))[0];
+  const existeObj = async (ruta) => Number(await uno(`select count(*) from storage.objects where name = $1`, [ruta])) === 1;
+  const activar = () => db.exec(`update core.config set valor = 'true'::jsonb where clave = 'purga_activa'`);
+  const rid = await nuevaRec();
+  t('hay una recepción de prueba', !!rid);
+
+  // -- apagada por defecto
+  const vieja = await foto(rid, 1);
+  t('el parámetro de retención es 60 días y la purga viene APAGADA', (await uno(`select valor from core.config where clave = 'dias_retencion_fotos'`)) === 60 && (await uno(`select valor from core.config where clave = 'purga_activa'`)) === false);
+  let r = await purgar(dd(), { origen: 'manual' });
+  t('apagada: no borra nada aunque haya una foto vieja con copia', r.ok && r.purgadas === 0 && r.candidatas === 0 && borradas.length === 0 && (await existeObj(vieja.ruta)) && r.detalle.some((x) => /apagada/.test(x)), JSON.stringify(r));
+  t('el administrador no puede pedir «purgar ahora» si está apagada', (await comoUsuario(ADMIN, `select public.api_purga_ahora()`)).error?.startsWith('E_CONFIG'));
+
+  // -- reglas de edad y copia
+  await activar();
+  const rid2 = await nuevaRec(), rid3 = await nuevaRec(), rid4 = await nuevaRec(), rid5 = await nuevaRec();
+  const joven = await foto(rid2, 1, { dias: 30 });
+  const sinCopia = await foto(rid3, 1, { dias: 90, respaldo: false });
+  const reciente = await foto(rid4, 1, { dias: 90, horasRespaldo: 2 });
+  const noConf = rid5 && (await foto(rid5, 1, { dias: 90, respaldo: false }));
+  await db.query(`update m01_recepcion.fotos_meta set confirmada = false where foto_id = $1`, [noConf.fid]);
+  let c = (await rpc('purga_fotos_candidatas', { p_max: 100 })).data;
+  t('solo es candidata la foto vieja con copia confirmada hace más de 24 h', c.fotos.length === 1 && c.fotos[0].foto_id === vieja.fid && c.candidatas_total === 1, JSON.stringify(c));
+  t('una foto de 30 días NO es candidata (menos de 60)', !c.fotos.some((x) => x.foto_id === joven.fid));
+  t('una foto vieja SIN copia en Drive NO es candidata', !c.fotos.some((x) => x.foto_id === sinCopia.fid));
+  t('una foto con copia confirmada hace 2 horas NO es candidata (gracia de 24 h)', !c.fotos.some((x) => x.foto_id === reciente.fid));
+  t('una foto sin confirmar NO es candidata', !c.fotos.some((x) => x.foto_id === noConf.fid));
+  t('la candidata trae ruta, id de Drive y tamaño', c.fotos[0].ruta === vieja.ruta && c.fotos[0].drive_file_id.length > 10 && Number(c.fotos[0].bytes_esperados) === 1200);
+  await db.exec(`update core.config set valor = '10'::jsonb where clave = 'dias_retencion_fotos'`);
+  c = (await rpc('purga_fotos_candidatas', { p_max: 100 })).data;
+  t('con la retención en 10 días, la de 30 días también es candidata (fechas simuladas)', c.fotos.some((x) => x.foto_id === joven.fid));
+  await db.exec(`update core.config set valor = '60'::jsonb where clave = 'dias_retencion_fotos'`);
+
+  // -- seguridad
+  t('un usuario con sesión NO puede llamar a las funciones de purga', (await comoUsuario(ADMIN, `select public.purga_fotos_candidatas(5)`)).error !== null && (await comoUsuario(ADMIN, `select public.purga_foto_marcar_ok('x')`)).error !== null);
+  t('un operativo no ve las purgas', (await comoUsuario(OPER, `select public.api_purgas()`)).error?.startsWith('E_PERMISO'));
+
+  // -- purga normal
+  const driveId = (await fila(vieja.fid)).drive_file_id;
+  r = await purgar(dd(), { origen: 'manual' });
+  t('purga la foto vieja con copia verificada', r.ok && r.candidatas === 1 && r.verificadas === 1 && r.purgadas === 1 && r.omitidas === 0 && r.errores === 0, JSON.stringify(r));
+  t('el archivo se borró del almacenamiento y SOLO ese', borradas.length === 1 && borradas[0] === vieja.ruta && !(await existeObj(vieja.ruta)) && (await existeObj(joven.ruta)) && (await existeObj(sinCopia.ruta)) && (await existeObj(reciente.ruta)));
+  const fv = await fila(vieja.fid);
+  t('la fila de la foto se CONSERVA con su copia de Drive y la fecha de purga', fv.purgada_supabase_en && fv.drive_file_id === driveId && fv.respaldo_drive_en);
+  t('las demás fotos no se tocaron', (await fila(joven.fid)).purgada_supabase_en === null && (await fila(sinCopia.fid)).purgada_supabase_en === null && (await fila(reciente.fid)).purgada_supabase_en === null);
+  t('queda en la auditoría con la ruta y el id de Drive', Number(await uno(`select count(*) from core.auditoria where accion = 'purgar_foto' and detalle->>'foto_id' = '${vieja.fid}' and detalle->>'drive_file_id' = '${driveId}'`)) === 1);
+  t('la corrida queda registrada', (await q(`select estado, purgadas, candidatas, quedan from core.purga_ejecuciones where purga_id = ${r.purga_id}`))[0].purgadas === 1);
+  t('la copia en Drive sigue intacta', Object.values(G.filesDrive).some((a) => a.id === driveId && !a.papelera));
+  r = await purgar(dd());
+  t('repetir no vuelve a borrar ni a verificar', r.ok && r.candidatas === 0 && borradas.length === 1);
+  t('la foto purgada ya no se intenta respaldar de nuevo', (await rpc('sync_fotos_pendientes', { p_max: 50 })).data.fotos.every((x) => x.foto_id !== vieja.fid));
+  t('no se puede «olvidar» el respaldo de una foto ya purgada', (await db.query(`select core.sync_fotos_olvidar('${vieja.fid}')`).then(() => 'ok', (e) => e.message)).startsWith('E_ESTADO'));
+
+  // -- la aplicación
+  const lista = await comoUsuario(ADMIN, `select public.api_m01_fotos_recepcion('${rid}')`);
+  t('la aplicación recibe «archivada» = true y la fecha', lista.data[0].archivada === true && !!lista.data[0].archivada_en);
+  const lista2 = await comoUsuario(ADMIN, `select public.api_m01_fotos_recepcion('${rid2}')`);
+  t('y «archivada» = false para una foto normal', lista2.data[0].archivada === false);
+  t('no se puede quitar una foto archivada desde la aplicación', (await comoUsuario(ADMIN, `select public.api_m01_eliminar_foto('${vieja.fid}')`)).error?.startsWith('E_FOTOS'));
+  t('sí se puede quitar una foto normal', (await comoUsuario(ADMIN, `select public.api_m01_eliminar_foto('${joven.fid}')`)).error === null);
+
+  // -- Drive no confirma: NO se borra
+  const ridA = await nuevaRec();
+  const sinArchivo = await foto(ridA, 1);
+  const driveA = (await fila(sinArchivo.fid)).drive_file_id;
+  const archivoA = G.filesDrive[driveA];
+  archivoA.papelera = true;
+  r = await purgar(dd());
+  t('si la copia está en la papelera de Drive: NO se borra, se anota el motivo', r.ok && r.verificadas === 0 && r.omitidas === 1 && r.purgadas === 0 && (await existeObj(sinArchivo.ruta)) && (await fila(sinArchivo.fid)).purgada_supabase_en === null, JSON.stringify(r));
+  const pf = (await q(`select intentos, ultimo_error, proximo_intento_en from core.purga_fotos where foto_id = $1`, [sinArchivo.fid]))[0];
+  t('queda el error y una espera de un día antes de reintentar', pf.intentos === 1 && /papelera/.test(pf.ultimo_error) && new Date(pf.proximo_intento_en) > new Date(Date.now() + 20 * 3600e3));
+  r = await purgar(dd());
+  t('al día siguiente (misma corrida) no se reintenta', r.candidatas === 0);
+  archivoA.papelera = false;
+  await db.exec(`update core.purga_fotos set proximo_intento_en = null, intentos = 1`);
+  const tam = archivoA.bytes; archivoA.bytes = Buffer.alloc(5);
+  r = await purgar(dd());
+  t('si el archivo de Drive pesa distinto: NO se borra', r.omitidas === 1 && r.purgadas === 0 && (await existeObj(sinArchivo.ruta)));
+  archivoA.bytes = tam; archivoA.desc = 'otra cosa';
+  await db.exec(`update core.purga_fotos set proximo_intento_en = null, intentos = 1`);
+  r = await purgar(dd());
+  t('si el archivo de Drive no es el de esa foto (descripción distinta): NO se borra', r.omitidas === 1 && r.purgadas === 0 && (await existeObj(sinArchivo.ruta)));
+  archivoA.desc = sinArchivo.ruta;
+  await db.exec(`update core.purga_fotos set proximo_intento_en = null, intentos = 1`);
+  delete G.filesDrive[driveA];
+  r = await purgar(dd());
+  t('si el archivo ya no existe en Drive: NO se borra', r.omitidas === 1 && r.purgadas === 0 && (await existeObj(sinArchivo.ruta)));
+  G.filesDrive[driveA] = archivoA;
+  await db.exec(`update core.purga_fotos set proximo_intento_en = null, intentos = 1`);
+
+  // -- el almacenamiento falla
+  falloBorrar = 'Storage no disponible';
+  r = await purgar(dd());
+  t('si el almacenamiento no borra: la foto NO se marca purgada y queda el error', r.errores === 1 && r.purgadas === 0 && (await fila(sinArchivo.fid)).purgada_supabase_en === null && /Storage no disponible/.test((await q(`select ultimo_error from core.purga_fotos`))[0].ultimo_error));
+  falloBorrar = null;
+  await db.exec(`update core.purga_fotos set proximo_intento_en = null, intentos = 1`);
+
+  // -- Google caído: no se borra nada
+  const fallaGoogle = async () => new Response('<html>Error</html>', { status: 500 });
+  fallo = fallaGoogle;
+  r = await purgar(dd());
+  t('si Google no responde: la corrida termina con error y NO se borra nada', !r.ok && /no se borró nada/.test(r.error) && (await existeObj(sinArchivo.ruta)) && (await fila(sinArchivo.fid)).purgada_supabase_en === null, JSON.stringify(r));
+  t('y la foto no se penaliza por la caída de Google', (await q(`select intentos from core.purga_fotos where foto_id = $1`, [sinArchivo.fid]))[0].intentos === 1);
+  fallo = null;
+  t('el error de Google no contiene el token', !JSON.stringify(r).includes(TOKEN));
+  t('la corrida queda «con_error» en el registro', (await q(`select estado from core.purga_ejecuciones where purga_id = ${r.purga_id}`))[0].estado === 'con_error');
+
+  // -- ahora sí
+  await db.exec(`update core.purga_fotos set proximo_intento_en = null, intentos = 1`);
+  r = await purgar(dd());
+  t('con todo en orden, la foto pendiente se purga', r.purgadas === 1 && (await fila(sinArchivo.fid)).purgada_supabase_en !== null && !(await existeObj(sinArchivo.ruta)));
+  t('y su historial de errores se limpia', Number(await uno(`select count(*) from core.purga_fotos where foto_id = '${sinArchivo.fid}'`)) === 0);
+
+  // -- ruta sospechosa
+  const ridB = await nuevaRec();
+  const rara = await foto(ridB, 1);
+  await db.query(`update m01_recepcion.fotos_meta set ruta = 'otro-bucket/../secreto.jpg' where foto_id = $1`, [rara.fid]);
+  const antes = borradas.length;
+  r = await purgar(dd());
+  t('una ruta que no tiene la forma de una foto de Recepción NUNCA se borra', r.omitidas === 1 && borradas.length === antes && (await fila(rara.fid)).purgada_supabase_en === null);
+  await db.query(`delete from m01_recepcion.fotos_meta where foto_id = $1`, [rara.fid]);
+
+  // -- muchas fotos: varias tandas
+  const rids = []; for (let i = 0; i < 6; i++) rids.push(await nuevaRec());
+  for (const x of rids) for (let k = 1; k <= 5; k++) await db.query(`insert into m01_recepcion.fotos_meta (foto_id, recepcion_id, lote_id, nn, ruta, nombre, tipo_mime, tamano_bytes, confirmada, subido_en, drive_file_id, respaldo_drive_en)
+     values ($1,$2,'995-995-995',$3,$4,'f.jpg','image/jpeg',1200,true, now() - interval '100 days', $5, now() - interval '5 days')`,
+     [`FOT-M01-995-995-995-${x}-0${k}`, x, k, `M01/995-995-995/${x}/FOT-M01-995-995-995-${x}-0${k}-zz${k}.jpg`, 'DRIVEID' + x.slice(-4) + k + 'ABCDEFGH']);
+  // el Drive simulado: crea los archivos que corresponden a esas 30 fotos
+  const raizFotos = G.raizFotos;
+  for (const x of rids) for (let k = 1; k <= 5; k++) {
+    const f = raizFotos.createFile({ n: `foto_0${k}.jpg`, m: 'image/jpeg', b: jpg(1200) });
+    f.setDescription(`M01/995-995-995/${x}/FOT-M01-995-995-995-${x}-0${k}-zz${k}.jpg`);
+    await db.query(`update m01_recepcion.fotos_meta set drive_file_id = $2 where foto_id = $1`, [`FOT-M01-995-995-995-${x}-0${k}`, f.id]);
+  }
+  const tot = Number((await rpc('purga_fotos_candidatas', { p_max: 1 })).data.candidatas_total);
+  r = await purgar(dd(), { tanda: 10, max_tandas: 2 });
+  t('con tandas de 10 y máximo 2 tandas, purga 20 y deja constancia de lo que queda', r.purgadas === 20 && r.quedan === tot - 20, JSON.stringify([r.purgadas, r.quedan, tot]));
+  r = await purgar(dd(), { tanda: 10, max_tandas: 5 });
+  t('la siguiente corrida termina el resto', r.purgadas === tot - 20 && r.quedan === 0);
+  t('se pidió borrar exactamente las 30 rutas de esas fotos, una sola vez cada una', borradas.filter((x) => /-zz\d\.jpg$/.test(x)).length === 30 && new Set(borradas).size === borradas.length);
+
+  // -- tiempo
+  const ridC = await nuevaRec();
+  await db.query(`insert into m01_recepcion.fotos_meta (foto_id, recepcion_id, lote_id, nn, ruta, nombre, tipo_mime, tamano_bytes, confirmada, subido_en, drive_file_id, respaldo_drive_en)
+     values ($1,$2,'995-995-995',1,$3,'f.jpg','image/jpeg',1200,true, now() - interval '100 days', 'DRIVEIDTIEMPO12345', now() - interval '5 days')`, [`FOT-M01-995-995-995-${ridC}-01`, ridC, `M01/995-995-995/${ridC}/FOT-M01-995-995-995-${ridC}-01-zz9.jpg`]);
+  let reloj = Date.now();
+  r = await purgar(deps({ borrar, firmar, ahora: () => (reloj += 200_000) }), { origen: 'prueba' });
+  t('si la corrida se queda sin tiempo, se detiene limpiamente', r.purgadas <= 1 && (r.ok || /Drive/.test(r.error ?? '')), JSON.stringify(r));
+
+  // -- la tarea diaria
+  await db.exec(`insert into vault.secrets (name, secret) values ('sync_funcion_url', 'https://abcd.supabase.co/functions/v1/sync-exportar'), ('sync_secreto', '${'S'.repeat(40)}') on conflict (name) do nothing`);
+  const pr = await db.query(`select core.purga_programar() as r`);
+  t('programar crea la tarea diaria a las 08:30 UTC (03:30 de Ecuador) y activa la purga', (await uno(`select schedule from cron.job where jobname = 'prodmazul-purga-fotos'`)) === '30 8 * * *' && (await uno(`select valor from core.config where clave = 'purga_activa'`)) === true);
+  t('el texto de la tarea no contiene secretos', !(await uno(`select command from cron.job where jobname = 'prodmazul-purga-fotos'`)).includes('SSSS'));
+  const dis = (await comoUsuario(ADMIN, `select public.api_purga_ahora()`));
+  t('«purgar ahora» pide la corrida con la acción «purgar» y el secreto en la cabecera', dis.error === null && (await q(`select body, headers from net._peticiones order by id desc limit 1`))[0].body.accion === 'purgar' && (await q(`select headers from net._peticiones order by id desc limit 1`))[0].headers['x-sync-secreto'] === 'S'.repeat(40));
+  const lp = await comoUsuario(ADMIN, `select public.api_purgas(5)`);
+  t('el administrador ve la lista de corridas, lo archivado y lo que falta', lp.data.programada === true && lp.data.activa === true && lp.data.fotos_archivadas >= 1 && Array.isArray(lp.data.ejecuciones) && lp.data.dias_retencion === 60);
+  await db.exec(`select core.purga_pausar()`);
+  t('pausar quita la tarea y apaga la purga', Number(await uno(`select count(*) from cron.job where jobname = 'prodmazul-purga-fotos'`)) === 0 && (await uno(`select valor from core.config where clave = 'purga_activa'`)) === false);
+  await db.exec(`delete from vault.secrets where name in ('sync_funcion_url','sync_secreto')`);
+  await db.query(`select core.purga_disparar('cron')`);
+  t('la tarea sin secretos NO falla: deja la corrida anotada con error', (await q(`select estado, error from core.purga_ejecuciones order by purga_id desc limit 1`))[0].estado === 'con_error');
+  const sinSec = await db.query(`select core.purga_disparar('manual')`).then(() => 'ok', (e) => e.message);
+  t('«purgar ahora» sin secretos da un mensaje claro', sinSec.startsWith('E_CONFIG'));
+}
+
+// ---------------------------------------------------------------- 10) la función con la acción «purgar»
+console.log('\nFunción sync-exportar · acción «purgar»');
+{
+  let manejador = null;
+  globalThis.Deno = { serve: (fn) => { manejador = fn; }, env: { get: (n) => ({ ...entorno, SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'k'.repeat(30) })[n] } };
+  await import('../../supabase/functions/sync-exportar/index.ts?otra=1').catch(() => null);
+  if (manejador) {
+    const pedir = async (cab, cuerpo) => { const r = await manejador(new Request('https://x.supabase.co/functions/v1/sync-exportar', { method: 'POST', headers: cab, body: JSON.stringify(cuerpo) })); return { estado: r.status, json: await r.json() }; };
+    let r = await pedir({}, { accion: 'purgar' });
+    t('purgar sin el secreto: 401', r.estado === 401);
+    r = await pedir({ 'x-sync-secreto': SECRETO }, { accion: 'purgar', origen: 'cron' });
+    t('con el secreto responde 200 con un resultado (aquí el doble de Supabase no tiene base)', r.estado === 200 && typeof r.json.ok === 'boolean');
+  } else { t('la función se carga', false); }
 }
 
 console.log(`\nResultado: ${ok} correctas, ${mal} con fallo`);

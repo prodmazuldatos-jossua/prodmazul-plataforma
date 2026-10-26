@@ -1,12 +1,14 @@
-Fase 5 - Parte 4: Respaldo de fotos en Drive
+Fase 5 - Parte 5: Retencion de 60 dias
 Archivos nuevos:
-  supabase/migrations/20261020000015_sync_fotos_drive.sql   (migracion 15)
-  docs/prueba_parte4_f5.sql           (prueba que se pega en el SQL Editor de Supabase; no deja datos)
-  tests/sql/fase5_parte4.mjs          (prueba automatica de la base, opcional)
+  supabase/migrations/20261020000016_fotos_retencion.sql   (migracion 16)
+  docs/prueba_parte5_f5.sql          (prueba que se pega en el SQL Editor de Supabase; no deja datos)
+  tests/sql/fase5_parte5.mjs         (prueba automatica de la base, opcional)
+  web/                                (archivos de la aplicacion que cambian: «Foto archivada en Drive»)
 Archivos actualizados:
-  apps-script/Codigo.gs               (receptor version 2.1: guardar_fotos y contar_fotos; se vuelve a pegar y publicar)
-  supabase/functions/sync-exportar/   (index.ts + nucleo.ts: fase de fotos; se vuelve a desplegar)
-  docs/consultas_exportador.sql       (consultas nuevas de fotos: 18 a 25)
+  apps-script/Codigo.gs               (receptor version 2.2: verificar_fotos; se vuelve a pegar y publicar)
+  supabase/functions/sync-exportar/   (index.ts + nucleo.ts: accion «purgar»; se vuelve a desplegar)
+  docs/consultas_exportador.sql       (consultas nuevas de la purga: 26 a 36)
   tests/exportador/, apps-script/tests/ (pruebas automaticas, opcionales)
-No cambia la aplicacion web. La carpeta de Drive debe quedar en acceso «Restringido»: si tiene un enlace compartido el receptor se niega a guardar fotos.
-Los secretos siguen sin estar en ningun archivo.
+La purga viene APAGADA: no borra nada hasta que la programas (paso de la guia). Solo borra fotos de mas de 60 dias cuya copia
+en Drive se comprueba en el momento (existe, no esta en la papelera, mismo tamano). La fila de la foto se conserva.
+Esta parte SI cambia la aplicacion web (3 archivos + pruebas): hay que probar, compilar y publicar.

@@ -1,4 +1,4 @@
-// Prodmazul · Fase 5 · Partes 3 y 4 · Lógica del exportador (sin depender de Supabase ni de Deno, para poder probarla).
+// Prodmazul · Fase 5 · Partes 3, 4 y 5 · Lógica del exportador (sin depender de Supabase ni de Deno, para poder probarla).
 // Hace esto, en este orden:
 //   1) pide a la base «el próximo lote» (sync_proximo_lote);
 //   2) lo envía al receptor de Google (Apps Script) con el token;
@@ -19,6 +19,8 @@ export interface Dependencias {
   log: (mensaje: string) => void;
   /** Crea una dirección temporal (firmada) para descargar una foto privada de Supabase Storage. */
   firmar?: (ruta: string, segundos: number) => Promise<{ url?: string; error?: string }>;
+  /** Borra archivos del almacenamiento privado de fotos (solo la usa la purga de la Parte 5). */
+  borrar?: (rutas: string[]) => Promise<{ error?: string }>;
 }
 export interface Opciones {
   origen?: string;
@@ -250,4 +252,106 @@ export async function probarGoogle(d: Dependencias): Promise<{ ok: boolean; vers
   const g = await llamarGoogle(d, cfg, { accion: 'ping' }, PREDETERMINADOS.tope_google_ms);
   if (!g.ok) return { ok: false, error: g.error };
   return { ok: true, version: String(g.datos?.version ?? '') };
+}
+
+
+// ======================================================================== Parte 5 · Retención de fotos
+export interface OpcionesPurga { origen?: string; purga_id?: number | null; tanda?: number; max_tandas?: number; tope_nueva_tanda_ms?: number; tope_total_ms?: number; tope_google_ms?: number }
+export interface ResultadoPurga {
+  ok: boolean; purga_id: number | null; candidatas: number; verificadas: number; purgadas: number; omitidas: number; errores: number;
+  quedan: number | null; error?: string; detalle: string[];
+}
+interface Candidata { foto_id: string; recepcion_id: string; ruta: string; drive_file_id: string; bytes_esperados: number }
+
+/** Una ruta de foto de Recepción tiene esta forma; nada más se borra jamás. */
+export const RUTA_FOTO = /^M01\/[A-Za-z0-9._-]{1,60}\/REC-\d{8}-\d{4}\/FOT-M01-[A-Za-z0-9._-]{3,80}\.(jpg|png|webp)$/;
+
+/**
+ * Purga diaria: borra del almacenamiento de Supabase las fotos que ya pasaron la retención Y cuya copia en Drive
+ * el receptor comprobó AHORA (existe, no está en la papelera, mismo tamaño, misma ruta). La fila de la foto se conserva.
+ * Si algo no se pudo comprobar o borrar, esa foto NO se marca como purgada y se reintenta otro día.
+ */
+export async function purgar(d: Dependencias, opc: OpcionesPurga = {}): Promise<ResultadoPurga> {
+  const o = { tanda: 50, max_tandas: 4, tope_nueva_tanda_ms: 90_000, tope_total_ms: 135_000, tope_google_ms: 60_000, ...opc };
+  const t0 = d.ahora();
+  const r: ResultadoPurga = { ok: true, purga_id: null, candidatas: 0, verificadas: 0, purgadas: 0, omitidas: 0, errores: 0, quedan: null, detalle: [] };
+  const secretos = [d.env('APPS_SCRIPT_TOKEN'), d.env('APPS_SCRIPT_URL'), d.env('SYNC_SECRETO')];
+
+  const abrir = await d.rpc('purga_abrir', { p_id: o.purga_id ?? null, p_origen: o.origen ?? 'manual' });
+  if (abrir.error) return { ...r, ok: false, error: limpiar(`No se pudo abrir la purga: ${abrir.error.message}`, secretos) };
+  r.purga_id = Number(abrir.data);
+
+  const cerrar = async (): Promise<ResultadoPurga> => {
+    const c = await d.rpc('purga_cerrar', {
+      p_id: r.purga_id, p_estado: r.ok ? 'ok' : 'con_error', p_candidatas: r.candidatas, p_purgadas: r.purgadas,
+      p_omitidas: r.omitidas, p_errores: r.errores, p_error: r.error ?? null,
+    });
+    if (!c.error && c.data && typeof c.data === 'object') r.quedan = Number((c.data as { quedan?: number }).quedan ?? 0);
+    else if (c.error) r.detalle.push(`No se pudo cerrar la purga: ${limpiar(c.error.message, secretos)}`);
+    return r;
+  };
+  const fallar = async (msg: string) => { r.ok = false; r.error = limpiar(msg, secretos); d.log(`sync-exportar (purga): ${r.error}`); return await cerrar(); };
+
+  const cfg = configuracionGoogle(d.env);
+  if ('error' in cfg) return await fallar(cfg.error);
+  if (!d.borrar) return await fallar('Esta función no puede borrar archivos del almacenamiento.');
+
+  const marcarError = async (foto_id: string, msg: string) => {
+    const m = await d.rpc('purga_foto_marcar_error', { p_foto_id: foto_id, p_error: limpiar(msg, secretos) });
+    if (m.error) r.detalle.push(`No se pudo anotar el error de ${foto_id}: ${limpiar(m.error.message, secretos)}`);
+  };
+
+  for (let tanda = 0; tanda < o.max_tandas; tanda++) {
+    if (tanda > 0 && d.ahora() - t0 > o.tope_nueva_tanda_ms) { r.detalle.push('Se detuvo por tiempo; el resto sigue para la próxima corrida.'); break; }
+    const p = await d.rpc('purga_fotos_candidatas', { p_max: o.tanda });
+    if (p.error) return await fallar(`La base no entregó las fotos: ${p.error.message}`);
+    const lista = (p.data as { activa?: boolean; vacio?: boolean; fotos?: Candidata[] }) ?? {};
+    if (lista.activa === false) { r.detalle.push('La purga está apagada (purga_activa = false): no se borró nada.'); break; }
+    if (!lista.fotos || lista.vacio || lista.fotos.length === 0) { if (tanda === 0) r.detalle.push('No hay fotos para purgar.'); break; }
+    r.candidatas += lista.fotos.length;
+
+    // 0) la ruta debe ser de una foto de Recepción (defensa extra)
+    const validas: Candidata[] = [];
+    for (const f of lista.fotos) {
+      if (!RUTA_FOTO.test(String(f.ruta)) || String(f.ruta).includes('..')) { r.omitidas += 1; await marcarError(f.foto_id, 'La ruta de la foto no tiene la forma esperada; no se borró.'); continue; }
+      validas.push(f);
+    }
+    if (validas.length === 0) continue;
+
+    // 1) el receptor comprueba, en este momento, que la copia sigue en Drive
+    const restante = o.tope_total_ms - (d.ahora() - t0);
+    const g = await llamarGoogle(d, cfg, {
+      accion: 'verificar_fotos',
+      fotos: validas.map((f) => ({ foto_id: f.foto_id, drive_file_id: f.drive_file_id, ruta: f.ruta, bytes_esperados: Number(f.bytes_esperados) })),
+    }, Math.min(o.tope_google_ms, restante));
+    if (!g.ok) return await fallar(`No se pudo verificar las copias en Drive; no se borró nada. ${g.error ?? ''}`);
+    const res = new Map(((g.datos?.resultados as Array<{ foto_id: string; ok?: boolean; pendiente?: boolean; error?: string }> | undefined) ?? []).map((x) => [x.foto_id, x]));
+
+    const aBorrar: Candidata[] = [];
+    for (const f of validas) {
+      const x = res.get(f.foto_id);
+      if (x?.ok === true) { aBorrar.push(f); r.verificadas += 1; }
+      else if (x?.pendiente === true) { r.detalle.push(`${f.foto_id}: el receptor se quedó sin tiempo; queda para otra corrida.`); }
+      else { r.omitidas += 1; await marcarError(f.foto_id, `Drive no confirmó la copia: ${x?.error ?? 'sin respuesta para esta foto'}`); }
+    }
+    if (aBorrar.length === 0) continue;
+
+    // 2) borrar del almacenamiento (solo las verificadas)
+    const b = await d.borrar(aBorrar.map((f) => f.ruta));
+    if (b.error) {
+      for (const f of aBorrar) { r.errores += 1; await marcarError(f.foto_id, `No se pudo borrar del almacenamiento: ${b.error}`); }
+      r.detalle.push(`Tanda ${tanda + 1}: el almacenamiento no borró (${limpiar(b.error, secretos)}).`);
+      continue;
+    }
+
+    // 3) anotar la purga (la fila de la foto se conserva)
+    let buenas = 0;
+    for (const f of aBorrar) {
+      const m = await d.rpc('purga_foto_marcar_ok', { p_foto_id: f.foto_id });
+      if (m.error) { r.errores += 1; await marcarError(f.foto_id, `Se borró el archivo pero la base no pudo anotarlo: ${m.error.message}`); }
+      else { r.purgadas += 1; buenas += 1; }
+    }
+    r.detalle.push(`Tanda ${tanda + 1}: ${buenas} de ${lista.fotos.length} purgadas.`);
+  }
+  return await cerrar();
 }
