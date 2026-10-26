@@ -318,3 +318,25 @@ h1 > .icono { color: var(--azul-oscuro); margin-right: .45rem; vertical-align: -
 .barra .interruptor button { min-height: 44px; min-width: 3.4rem; }
 .migas a { min-height: 44px; }
 @media (max-width: 40rem) { .barra .interruptor button { min-width: 2.9rem; } }
+
+/* ---------- ajustes: interruptores compactos al lado de otros elementos */
+.interruptor-compacto { flex: none; align-self: flex-start; }
+.interruptor-compacto button { min-height: 38px; min-width: 0; padding: 0 .9rem; font-size: .92rem; }
+.fila-compacta { display: flex; align-items: center; gap: .75rem; flex-wrap: nowrap; min-height: 38px; }
+.fila-compacta .leyenda-cantidad { margin: 0; padding: .2rem .8rem; border-radius: 999px; background: #D3EAF3; color: var(--primario-osc); white-space: nowrap; }
+.fila-lote { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.fila-lote .etiqueta-falsa { margin: 0; font-weight: 700; color: var(--marino); }
+.fila-lote .interruptor { margin: 0 0 0 auto; }
+.grupo-lote .fila-lote .interruptor { margin: 0 0 0 auto; }
+
+/* ---------- usuarios */
+.lista-usuarios { list-style: none; margin: 1rem 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); gap: 1rem; }
+.tarjeta-usuario { display: grid; grid-template-columns: auto 1fr; gap: .25rem 1rem; align-items: start; margin: 0; max-width: none; }
+.tarjeta-usuario.usuario-inactivo { opacity: .8; border-style: dashed; }
+.usuario-avatar { background: var(--azul-oscuro); color: #fff; width: 3.2rem; height: 3.2rem; }
+.usuario-datos { min-width: 0; }
+.usuario-datos p { margin: 0; }
+.usuario-nombre { font-weight: 800; color: var(--marino); font-size: 1.1rem; overflow-wrap: anywhere; }
+.usuario-correo { color: var(--suave); overflow-wrap: anywhere; }
+.usuario-etiquetas { display: flex; flex-wrap: wrap; gap: .4rem; margin: .4rem 0 !important; }
+.usuario-acciones { grid-column: 1 / -1; margin-top: .5rem; }

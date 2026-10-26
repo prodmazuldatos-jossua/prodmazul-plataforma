@@ -33,7 +33,7 @@ export function recepcionAForm(r: RecepcionDetalle): FormRecepcion {
   };
 }
 
-export interface Capacidades { editar: boolean; anular: boolean; eliminar: boolean; reactivar: boolean }
+export interface Capacidades { editar: boolean; devolver: boolean; anular: boolean; eliminar: boolean; reactivar: boolean }
 
 /**
  * Qué botones se ofrecen. Reglas iguales a las de la base de datos:
@@ -49,6 +49,7 @@ export function capacidades(
   const activa = r.estado === 'borrador' || r.estado === 'cerrado';
   return {
     editar: activa && puede('editar') && (esAutor || admin),
+    devolver: r.estado === 'cerrado' && puede('editar') && (esAutor || admin),
     anular: activa && puede('anular') && (esAutor || admin),
     eliminar: r.estado !== 'eliminado' && admin,
     reactivar: (r.estado === 'anulado' || r.estado === 'eliminado') && admin,

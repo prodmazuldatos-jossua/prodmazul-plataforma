@@ -74,3 +74,11 @@ describe('bloques de gavetas', () => {
     expect(totalLibrasAprox([f(100), f(null), f(50.5)])).toBe(150.5);
   });
 });
+
+import { formatoTemp } from './controles';
+describe('formatoTemp', () => {
+  it('siempre un decimal, igual en bines y gavetas', () => {
+    expect(formatoTemp(-3)).toContain('-3.0');
+    expect(formatoTemp(2.46)).toContain('2.5');
+  });
+});

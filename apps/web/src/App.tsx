@@ -7,6 +7,16 @@ import RutaProtegida, { RequiereModulo } from './core/auth/RutaProtegida';
 import Layout from './core/Layout';
 import Inicio from './core/Inicio';
 import { MODULOS } from './modules';
+import { lazy } from 'react';
+import { useAuth } from './core/auth/AuthContext';
+
+const PaginaUsuarios = lazy(() => import('./core/admin/PaginaUsuarios'));
+
+/** Solo el administrador general entra a las pantallas de administración. */
+function SoloAdmin({ children }: { children: React.ReactNode }) {
+  const { perfil } = useAuth();
+  return perfil?.es_admin_general ? <>{children}</> : <Navigate to="/" replace />;
+}
 
 // Se usa un enrutador de datos para poder avisar al salir de un formulario con cambios sin guardar.
 const router = createBrowserRouter([
@@ -19,6 +29,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <Inicio /> },
           { path: '/cuenta/clave', element: <PaginaCambiarClave /> },
+          { path: '/admin/usuarios', element: <SoloAdmin><PaginaUsuarios /></SoloAdmin> },
           ...MODULOS.map((m) => ({ path: `${m.ruta}/*`, element: <RequiereModulo id={m.id}><m.componente /></RequiereModulo> })),
           { path: '*', element: <Navigate to="/" replace /> },
         ],

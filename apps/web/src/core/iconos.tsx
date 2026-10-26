@@ -39,6 +39,9 @@ const TRAZOS: Record<string, ReactNode> = {
   termometro: <><path d="M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z" /><path d="M12 9v7" /></>,
   caja: <><path d="M3.5 8 12 4l8.5 4v8L12 20l-8.5-4z" /><path d="M7.8 6 16 10v4M3.5 8 12 12l8.5-4M12 12v8" /></>,
   nota: <><path d="M6 3.5h9l4 4v13H6z" /><path d="M9 11h7M9 14.5h7M9 18h4" /></>,
+  excel: <><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9.5 11.5l5 6M14.5 11.5l-5 6" /></>,
+  usuarios: <><circle cx="9" cy="8.5" r="3.3" /><path d="M2.8 19.5c.5-3.3 3-5 6.2-5s5.7 1.7 6.2 5M16 5.500a3.3 3.3 0 0 1 0 6M18 14.700c1.7.6 2.9 2.2 3.2 4.8" /></>,
+  clave: <><circle cx="8" cy="15" r="4" /><path d="m11 12 8.5-8.500M16 6.500l2.5 2.500M14 8.500l2 2" /></>,
   lista: <><path d="M9 6.5h11M9 12h11M9 17.5h11" /><circle cx="4.8" cy="6.5" r=".8" /><circle cx="4.8" cy="12" r=".8" /><circle cx="4.8" cy="17.5" r=".8" /></>,
 };
 

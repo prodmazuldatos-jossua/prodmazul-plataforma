@@ -11,6 +11,8 @@ import InsigniaEstado from './InsigniaEstado';
 import { paginacion } from './mapeo';
 import type { FiltrosListado, RespuestaListado } from './tipos';
 import { Icono } from '../../core/iconos';
+import { useOnline } from '../../lib/conexion';
+import { descargarExcelRecepciones } from './excelDescarga';
 
 const POR_PAGINA = 20;
 const ESTADOS_VALIDOS = ['activos', 'borrador', 'cerrado', 'anulado', 'todos', 'eliminado'];
@@ -33,6 +35,18 @@ export default function ListadoRecepciones() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [intento, setIntento] = useState(0);
+  const online = useOnline();
+  const [exportando, setExportando] = useState(false);
+  const [avisoExcel, setAvisoExcel] = useState<{ tipo: 'exito' | 'error'; texto: string } | null>(null);
+  const exportar = async () => {
+    setExportando(true); setAvisoExcel(null);
+    try {
+      const r = await descargarExcelRecepciones();
+      setAvisoExcel({ tipo: 'exito', texto: `Excel descargado: ${r.nombre} (${r.recepciones} ${r.recepciones === 1 ? 'recepción' : 'recepciones'}, pesos en libras).` });
+    } catch (e) {
+      setAvisoExcel({ tipo: 'error', texto: `No se pudo generar el Excel. ${mensajeDe(e)}` });
+    } finally { setExportando(false); }
+  };
 
   const cambiar = (cambios: Record<string, string>, reiniciarPagina = true) => {
     const nuevo = new URLSearchParams(params);
@@ -67,8 +81,17 @@ export default function ListadoRecepciones() {
     <>
       <div className="encabezado-lista">
         <h1><Icono nombre="recepcion" tamano={28} />Recepciones</h1>
-        {puede('M01', 'crear') && <Link className="boton-primario enlace-boton" to="/m01/nueva"><Icono nombre="mas" />Nueva recepción</Link>}
+        <div className="acciones-fila acciones-detalle">
+          {puede('M01', 'ver_reportes') && (
+            <button type="button" className="boton-secundario" data-testid="boton-excel" disabled={exportando || !online} onClick={() => void exportar()}
+                    title={online ? 'Descarga todas las recepciones con todas sus columnas' : 'Necesitas conexión para descargar el Excel'}>
+              <Icono nombre="excel" />{exportando ? 'Preparando Excel…' : 'Descargar Excel'}
+            </button>
+          )}
+          {puede('M01', 'crear') && <Link className="boton-primario enlace-boton" to="/m01/nueva"><Icono nombre="mas" />Nueva recepción</Link>}
+        </div>
       </div>
+      {avisoExcel && <Alerta tipo={avisoExcel.tipo}>{avisoExcel.texto}</Alerta>}
 
       <form className="filtros-lista" onSubmit={(e) => e.preventDefault()} aria-label="Filtros del listado">
         <div className="campo campo-busqueda">

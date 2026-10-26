@@ -2,6 +2,7 @@ import {
   FORMATO_LOTE_POR_DEFECTO, MAX_LECTURAS, NUM_GAVETAS_MAX, type AlmacenamientoForm, type Errores, type ErroresFilas, type FormRecepcion,
 } from './tipos';
 import { normalizar } from '../../lib/texto';
+import { totalPesos } from './calculos';
 
 export interface ContextoValidacion {
   /** Expresión regular del lote (viene de la configuración de la base de datos). */
@@ -14,6 +15,8 @@ export interface ContextoValidacion {
   loteExiste: boolean | null;
   /** true si el lote ya está cerrado y la recepción es nueva: no se admiten más camiones. */
   loteCerrado?: boolean;
+  /** Cómo se escribe un peso en la unidad elegida (para los mensajes). */
+  pesoTexto?: (lb: number) => string;
 }
 
 export const TEMPERATURA_MIN = -50;
@@ -61,6 +64,15 @@ export function validarRecepcion(f: FormRecepcion, c: ContextoValidacion): Error
 
   if (f.libras_reportadas !== null && f.libras_reportadas <= 0) e.libras_reportadas = 'Debe ser mayor que cero.';
   if (f.libras_planta !== null && f.libras_planta <= 0) e.libras_planta = 'Debe ser mayor que cero.';
+  // Las libras no pueden ser menores que el peso total de las gavetas registradas.
+  const totalGavetas = totalPesos(f.gavetas);
+  const enUnidad = c.pesoTexto ?? ((lb: number) => `${lb.toFixed(2)} lb`);
+  if (!e.libras_reportadas && f.libras_reportadas !== null && f.libras_reportadas < totalGavetas) {
+    e.libras_reportadas = `No puede ser menor que el peso total de las gavetas (${enUnidad(totalGavetas)}).`;
+  }
+  if (!e.libras_planta && f.libras_planta !== null && f.libras_planta < totalGavetas) {
+    e.libras_planta = `No puede ser menor que el peso total de las gavetas (${enUnidad(totalGavetas)}).`;
+  }
 
   if (f.hora_inicio_descarga && f.hora_fin_descarga && f.hora_fin_descarga < f.hora_inicio_descarga) {
     e.hora_fin_descarga = 'La hora de fin no puede ser anterior a la de inicio.';

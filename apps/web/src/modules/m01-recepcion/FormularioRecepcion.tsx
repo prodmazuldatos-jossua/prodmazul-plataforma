@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Alerta, Modal } from '../../core/ui';
-import { PesoInput } from '../../lib/unidades';
+import { PesoInput, useUnidad } from '../../lib/unidades';
+import { totalPesos } from './calculos';
 import { aApiError, mensajeDe } from '../../lib/errores';
 import { hoyEcuador } from '../../lib/fechas';
 import { Campo, CampoTexto, Conmutador } from './controles';
@@ -33,7 +34,7 @@ const ORDEN_CAMPOS: CampoForm[] = [
 const vacio = (): FormRecepcion => ({
   fecha_llegada: hoyEcuador(), placa_vehiculo: '', lote_id: '', proveedor: '', especie: '', piscina: '', guia_remision: '',
   llegada_en: 'bines', num_gavetas_bines: '', libras_reportadas: null, libras_planta: null, hora_inicio_descarga: '', hora_fin_descarga: '',
-  observacion: '', cerrar_lote: false, gavetas: gavetasVacias(), temperaturas: lecturasVacias(), almacenamiento: [filaAlmacenamientoVacia()],
+  observacion: '', cerrar_lote: true, gavetas: gavetasVacias(), temperaturas: lecturasVacias(), almacenamiento: [filaAlmacenamientoVacia()],
 });
 
 type Mensaje = { tipo: 'exito' | 'error' | 'aviso'; texto: string } | null;
@@ -45,10 +46,39 @@ interface Props {
   onRecargar?: () => void;
   /** Si se indica, se corrige una recepción guardada en este dispositivo que el servidor rechazó. */
   pendiente?: Pendiente;
+  /** Se llama al guardar una recepción NUEVA: quien lo usa vacía el formulario y muestra el aviso. */
+  onGuardadoNuevo?: (aviso: AvisoGuardado) => void;
 }
 
-/** Formulario de recepción completo: datos generales, gavetas, temperaturas, almacenamiento y cierre. */
-export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: Props = {}) {
+/** Mensaje que se muestra sobre el formulario ya vacío después de guardar. */
+export interface AvisoGuardado { tipo: 'exito' | 'aviso'; texto: ReactNode; segundos: number }
+
+/**
+ * Formulario de recepción completo: datos generales, gavetas, temperaturas, almacenamiento y cierre.
+ * Al guardar una recepción nueva (borrador o cerrada) el formulario se vuelve a crear desde cero: no queda ningún dato anterior.
+ */
+export default function FormularioRecepcion(props: Omit<Props, 'onGuardadoNuevo'> = {}) {
+  const [instancia, setInstancia] = useState(0);
+  const [aviso, setAviso] = useState<AvisoGuardado | null>(null);
+  useEffect(() => {
+    if (!aviso) return;
+    const t = setTimeout(() => setAviso(null), aviso.segundos * 1000);
+    return () => clearTimeout(t);
+  }, [aviso]);
+  return (
+    <>
+      {aviso && (
+        <Alerta tipo={aviso.tipo}>
+          {aviso.texto} <button type="button" className="boton-enlace" onClick={() => setAviso(null)}>Cerrar aviso</button>
+        </Alerta>
+      )}
+      <FormularioInterno key={instancia} {...props}
+                         onGuardadoNuevo={(a) => { setAviso(a); setInstancia((n) => n + 1); window.scrollTo({ top: 0 }); }} />
+    </>
+  );
+}
+
+function FormularioInterno({ inicial, onRecargar, pendiente, onGuardadoNuevo }: Props) {
   const { perfil, puede } = useAuth();
   const navigate = useNavigate();
   const editando = Boolean(inicial);
@@ -64,14 +94,18 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
   /** Lote en el que ya está guardada la recepción: ahí sigue permitido aunque el lote se haya cerrado. */
   const loteGuardado = useRef<string | null>(inicial ? inicial.lote_id : null);
   const salidaLibre = useRef(false);
-  const [cerrada, setCerrada] = useState<RespuestaGuardar | null>(null);
   const [infoLote, setInfoLote] = useState<InfoLote | null>(null);
   const [formatoLote, setFormatoLote] = useState(FORMATO_LOTE_POR_DEFECTO);
   const [fotosNuevas, setFotosNuevas] = useState<FotoNueva[]>(() => (pendiente?.fotos ?? []).map((x) => ({
     id: x.id, nombre: x.nombre, tipo: x.tipo, blob: x.blob, tamano: x.tamano, previewUrl: URL.createObjectURL(x.blob), estado: 'lista' as const,
   })));
-  /** La recepción quedó guardada en este dispositivo (sin señal) y espera para enviarse. */
-  const [enCola, setEnCola] = useState<{ guia: string; lote: string; fotos: number } | null>(null);
+  const { texto: textoPeso } = useUnidad();
+  const [avisoLoteAbierto, setAvisoLoteAbierto] = useState(false);
+  useEffect(() => {
+    if (!avisoLoteAbierto) return;
+    const t = setTimeout(() => setAvisoLoteAbierto(false), 5000);
+    return () => clearTimeout(t);
+  }, [avisoLoteAbierto]);
   const fotosRef = useRef<FotoNueva[]>([]);
   fotosRef.current = fotosNuevas;
   const [refrescoFotos, setRefrescoFotos] = useState(0);
@@ -158,11 +192,16 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
   /** Lo que sigue cuando la recepción y sus fotos quedaron resueltas. */
   const continuar = (r: RespuestaGuardar, estado: 'borrador' | 'cerrado') => {
     setPendienteFin(null);
-    if (editando && (estado === 'cerrado' || inicial?.estado === 'cerrado')) {
+    if (editando) {
       salidaLibre.current = true;
-      navigate(`/m01/${r.recepcion_id}`, { state: { aviso: r.lote_cerrado ? 'Cambios guardados. El lote quedó cerrado.' : 'Cambios guardados.' } });
-    } else if (estado === 'cerrado') setCerrada(r);
-    else setMensaje({ tipo: 'exito', texto: `Borrador guardado como ${r.recepcion_id}. Puedes seguir completando y volver a guardar.` });
+      navigate(`/m01/${r.recepcion_id}`, { state: { aviso: estado === 'cerrado' ? (r.lote_cerrado ? 'Cambios guardados. El lote quedó cerrado.' : 'Cambios guardados.') : 'Borrador guardado.' } });
+      return;
+    }
+    const lote = f.lote_id.trim().toUpperCase();
+    setSucio(false);
+    onGuardadoNuevo?.(estado === 'cerrado'
+      ? { tipo: 'exito', segundos: 8, texto: <>La recepción <strong>{r.recepcion_id}</strong> se guardó y quedó cerrada. {r.lote_cerrado ? <>El lote <strong>{lote}</strong> quedó <strong>cerrado</strong>.</> : <>El lote <strong>{lote}</strong> sigue <strong>abierto</strong>: puede llegar otro camión.</>} El formulario está listo para otra recepción.</> }
+      : { tipo: 'exito', segundos: 8, texto: <>Borrador <strong>{r.recepcion_id}</strong> guardado. Para completarlo búscalo en Recepciones y presiona <strong>Editar</strong>. El formulario está listo para otra recepción.</> });
   };
 
   const reintentarFotos = async () => {
@@ -203,7 +242,7 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
       salidaLibre.current = true;
       navigate('/m01/pendientes', { state: { aviso: 'Corregida. Se enviará en cuanto haya conexión.' } });
     } else {
-      setEnCola({ guia: resumen.guia_remision, lote: resumen.lote_id, fotos: fotos.length });
+      onGuardadoNuevo?.({ tipo: 'aviso', segundos: 20, texto: <>La recepción con guía <strong>{resumen.guia_remision}</strong> (lote <strong>{resumen.lote_id}</strong>) se guardó en <strong>este dispositivo</strong> y todavía <strong>no está en el servidor</strong>. Se enviará sola en cuanto haya conexión{fotos.length > 0 ? `, junto con ${fotos.length} foto${fotos.length === 1 ? '' : 's'}` : ''}. No borres los datos del navegador hasta que se envíe. El formulario está listo para otra recepción.</> });
     }
     return true;
   };
@@ -214,7 +253,7 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
       return;
     }
     const loteExiste = infoLote ? infoLote.existe : null;
-    const errs = validarRecepcion(f, { formatoLote, hoy: hoyEcuador(), cerrando: estado === 'cerrado', loteExiste, loteCerrado: infoLote?.cerrado === true && loteGuardado.current !== f.lote_id.trim().toUpperCase() });
+    const errs = validarRecepcion(f, { formatoLote, hoy: hoyEcuador(), cerrando: estado === 'cerrado', loteExiste, loteCerrado: infoLote?.cerrado === true && loteGuardado.current !== f.lote_id.trim().toUpperCase(), pesoTexto: textoPeso });
     const hayErrores = ORDEN_CAMPOS.some((c) => errs[c]) || Boolean(errs.gavetas) || Boolean(errs.filas);
     if (hayErrores) {
       setErrores(errs);
@@ -281,49 +320,11 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
     }
   };
 
-  const reiniciar = () => {
-    clientUuid.current = crypto.randomUUID();
-    proveedorHeredado.current = false;
-    fotosRef.current.forEach((x) => { if (x.previewUrl) URL.revokeObjectURL(x.previewUrl); });
-    setFotosNuevas([]); setPendienteFin(null); setRefrescoFotos(0);
-    setF(vacio()); setErrores({}); setMensaje(null); setSucio(false); setMeta(null); setCerrada(null); setInfoLote(null); setEnCola(null);
-  };
-
-  if (enCola) {
-    return (
-      <>
-        <h1>Guardada en este dispositivo</h1>
-        <Alerta tipo="aviso" >
-          La recepción con guía <strong>{enCola.guia}</strong> (lote <strong>{enCola.lote}</strong>) se guardó en <strong>este dispositivo</strong> y todavía <strong>no está en el servidor</strong>.
-          Se enviará sola en cuanto haya conexión{enCola.fotos > 0 ? `, junto con ${enCola.fotos} foto${enCola.fotos === 1 ? '' : 's'}` : ''}.
-        </Alerta>
-        <p className="texto-suave">No borres los datos del navegador ni desinstales la aplicación hasta que se envíe. Puedes seguir registrando otras recepciones; el contador de pendientes está arriba.</p>
-        <div className="acciones-fila">
-          <button className="boton-primario" onClick={reiniciar}>Registrar otra recepción</button>
-          <Link className="boton-secundario enlace-boton" to="/m01/pendientes">Ver pendientes</Link>
-          <Link className="boton-secundario enlace-boton" to="/m01">Volver a Recepción</Link>
-        </div>
-      </>
-    );
-  }
-
-  if (cerrada) {
-    return (
-      <>
-        <h1>Recepción cerrada</h1>
-        <Alerta tipo="exito">La recepción <strong>{cerrada.recepcion_id}</strong> se guardó y quedó cerrada.</Alerta>
-        {cerrada.lote_cerrado
-          ? <Alerta tipo="aviso">El lote <strong>{f.lote_id.trim().toUpperCase()}</strong> quedó <strong>cerrado</strong>: no admite más camiones.</Alerta>
-          : <p className="texto-suave">El lote <strong>{f.lote_id.trim().toUpperCase()}</strong> sigue <strong>abierto</strong>: puede llegar otro camión.</p>}
-        <div className="acciones-fila">
-          <button className="boton-primario" onClick={reiniciar}>Registrar otra recepción</button>
-          <Link className="boton-secundario enlace-boton" to="/m01">Volver a Recepción</Link>
-        </div>
-      </>
-    );
-  }
-
   const heredado = infoLote?.existe === true;
+  /** Aviso inmediato: las libras no pueden ser menores que el peso total de las gavetas ya escritas. */
+  const totalGavetas = totalPesos(f.gavetas);
+  const avisoLibras = (lb: number | null) =>
+    lb !== null && lb > 0 && lb < totalGavetas ? `No puede ser menor que el peso total de las gavetas (${textoPeso(totalGavetas)}).` : undefined;
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate aria-label="Formulario de recepción">
       <h1>{editando ? `Editar recepción ${inicial?.recepcion_id}` : corrigiendo ? 'Corregir recepción pendiente' : 'Nueva recepción'}</h1>
@@ -365,21 +366,21 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
                       onChange={(v) => cambiar('guia_remision', v)} error={errores.guia_remision} maxLength={60} />
           <div className="campo" data-testid="grupo-llegada">
             <p className="etiqueta-falsa" id="llegada_en-etiqueta">El producto llegó en</p>
-            <Conmutador idBase="llegada" ariaLabel="El producto llegó en bines o en gavetas" valor={f.llegada_en}
-                        opciones={[{ valor: 'bines', texto: 'Bines' }, { valor: 'gavetas', texto: 'Gavetas' }]}
-                        onChange={(v) => cambiar('llegada_en', v)} />
+            <div className="fila-compacta">
+              <Conmutador compacto idBase="llegada" ariaLabel="El producto llegó en bines o en gavetas" valor={f.llegada_en}
+                          opciones={[{ valor: 'bines', texto: 'Bines' }, { valor: 'gavetas', texto: 'Gavetas' }]}
+                          onChange={(v) => cambiar('llegada_en', v)} />
+              {/^\d+$/.test(f.num_gavetas_bines) && Number(f.num_gavetas_bines) > 0 && (
+                <p className="leyenda-cantidad" data-testid="leyenda-cantidad" aria-live="polite">{textoCantidad(Number(f.num_gavetas_bines), f.llegada_en)}</p>
+              )}
+            </div>
           </div>
-          <div>
-            <CampoTexto id="num_gavetas_bines" etiqueta="N.º de gavetas o bines" obligatorio modo="numeric" value={f.num_gavetas_bines}
-                        onChange={(v) => cambiar('num_gavetas_bines', v.replace(/\D/g, ''))} error={errores.num_gavetas_bines} maxLength={4} />
-            {/^\d+$/.test(f.num_gavetas_bines) && Number(f.num_gavetas_bines) > 0 && (
-              <p className="leyenda-cantidad" data-testid="leyenda-cantidad" aria-live="polite">{textoCantidad(Number(f.num_gavetas_bines), f.llegada_en)}</p>
-            )}
-          </div>
+          <CampoTexto id="num_gavetas_bines" etiqueta="N.º de gavetas o bines" obligatorio modo="numeric" value={f.num_gavetas_bines}
+                      onChange={(v) => cambiar('num_gavetas_bines', v.replace(/\D/g, ''))} error={errores.num_gavetas_bines} maxLength={4} />
           <PesoInput id="libras_reportadas" etiqueta="Libras reportadas" value={f.libras_reportadas}
-                     onChange={(v) => cambiar('libras_reportadas', v)} error={errores.libras_reportadas} />
+                     onChange={(v) => cambiar('libras_reportadas', v)} error={errores.libras_reportadas ?? avisoLibras(f.libras_reportadas)} />
           <PesoInput id="libras_planta" etiqueta="Libras de planta" value={f.libras_planta}
-                     onChange={(v) => cambiar('libras_planta', v)} error={errores.libras_planta} />
+                     onChange={(v) => cambiar('libras_planta', v)} error={errores.libras_planta ?? avisoLibras(f.libras_planta)} />
           <CampoTexto id="hora_inicio_descarga" etiqueta="Hora de inicio de descarga" tipo="time" value={f.hora_inicio_descarga}
                       onChange={(v) => cambiar('hora_inicio_descarga', v)} error={errores.hora_inicio_descarga} />
           <CampoTexto id="hora_fin_descarga" etiqueta="Hora de fin de descarga" tipo="time" value={f.hora_fin_descarga}
@@ -402,14 +403,22 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
                       onChange={(e) => cambiar('observacion', e.target.value)} />
           </Campo>
           <div className="campo grupo-lote" data-testid="grupo-cerrar-lote">
-            <p className="etiqueta-falsa" id="cerrar_lote-etiqueta">¿Llegan más camiones con este lote?</p>
             {infoLote?.cerrado === true ? (
-              <p className="ayuda" data-testid="lote-ya-cerrado">El lote <strong>{f.lote_id.trim().toUpperCase()}</strong> ya está <strong>cerrado</strong>. Un administrador puede reabrirlo.</p>
+              <>
+                <p className="etiqueta-falsa" id="cerrar_lote-etiqueta">¿Llegan más camiones con este lote?</p>
+                <p className="ayuda" data-testid="lote-ya-cerrado">El lote <strong>{f.lote_id.trim().toUpperCase()}</strong> ya está <strong>cerrado</strong>. Un administrador puede reabrirlo.</p>
+              </>
             ) : (
               <>
-                <Conmutador idBase="lote" ariaLabel="Estado del lote al guardar" valor={f.cerrar_lote ? 'cerrado' : 'abierto'}
-                            opciones={[{ valor: 'abierto', texto: 'Lote abierto' }, { valor: 'cerrado', texto: 'Cerrar lote' }]}
-                            onChange={(v) => cambiar('cerrar_lote', v === 'cerrado')} />
+                <div className="fila-lote">
+                  <p className="etiqueta-falsa" id="cerrar_lote-etiqueta">¿Llegan más camiones con este lote?</p>
+                  <Conmutador compacto idBase="lote" ariaLabel="Estado del lote al guardar" valor={f.cerrar_lote ? 'cerrado' : 'abierto'}
+                              opciones={[{ valor: 'abierto', texto: 'Lote abierto' }, { valor: 'cerrado', texto: 'Cerrar lote' }]}
+                              onChange={(v) => { cambiar('cerrar_lote', v === 'cerrado'); setAvisoLoteAbierto(v === 'abierto'); }} />
+                </div>
+                {avisoLoteAbierto && !f.cerrar_lote && (
+                  <p className="aviso-campo aviso-nuevo" role="status" data-testid="aviso-lote-abierto">Este lote quedará abierto: se va a completar en otra recepción (otro camión).</p>
+                )}
                 <p className="ayuda">Un lote cerrado ya no admite recepciones nuevas (un administrador puede reabrirlo). Un borrador nunca cierra el lote.</p>
               </>
             )}

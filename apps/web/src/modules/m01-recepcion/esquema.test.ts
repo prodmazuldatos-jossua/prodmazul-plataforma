@@ -214,3 +214,22 @@ describe('bines o gavetas', () => {
     expect(validarRecepcion(f, ctx({ cerrando: true })).num_gavetas_bines).toBeUndefined();
   });
 });
+
+describe('libras frente al peso de las gavetas', () => {
+  const pesos = () => base({ gavetas: conPesos({ 0: 600, 1: 500 }), libras_reportadas: 1000, libras_planta: 1100 });
+  it('libras reportadas menores al total de gavetas dan error', () => {
+    expect(validarRecepcion(pesos(), ctx()).libras_reportadas).toMatch(/menor que el peso total/);
+    expect(validarRecepcion(pesos(), ctx()).libras_planta).toBeUndefined();
+  });
+  it('libras de planta menores al total de gavetas dan error', () => {
+    const e = validarRecepcion(base({ gavetas: conPesos({ 0: 600, 1: 500 }), libras_reportadas: 1100, libras_planta: 1099.99 }), ctx());
+    expect(e.libras_planta).toMatch(/menor que el peso total/);
+    expect(e.libras_reportadas).toBeUndefined();
+  });
+  it('iguales o mayores son válidas', () => {
+    expect(validarRecepcion(base({ gavetas: conPesos({ 0: 600, 1: 500 }), libras_reportadas: 1100, libras_planta: 1100 }), ctx())).toEqual({});
+  });
+  it('usa la unidad elegida en el mensaje', () => {
+    expect(validarRecepcion(pesos(), ctx({ pesoTexto: (lb) => `${(lb / 2.20462).toFixed(1)} kg` })).libras_reportadas).toContain('kg');
+  });
+});

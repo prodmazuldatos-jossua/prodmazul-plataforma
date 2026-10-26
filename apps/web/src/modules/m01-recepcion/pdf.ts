@@ -60,8 +60,9 @@ export function pesoTexto(lb: number | null | undefined, unidad: Unidad): string
   return numero.format(unidad === 'kg' ? lb / FACTOR_LB_KG : lb);
 }
 
+/** Temperatura siempre con un decimal, igual que se guarda y se ve en pantalla: -3.0, 2.5. */
 export function temperaturaTexto(c: number): string {
-  return String(Math.round(c * 100) / 100);
+  return c.toFixed(1);
 }
 
 /** Promedio (en libras) de las gavetas de un bloque de 10; null si no hay ninguna. */
@@ -302,10 +303,6 @@ function firmas(c: Ctx, p: PDFPage, top: number) {
     escribir(p, ets[i], x, top + 32, c.negrita, 8.5, { ancho: w, alin: 'centro' });
     if (nombre[i]) escribir(p, nombre[i], x, top + 42, c.normal, 8.5, { ancho: w, alin: 'centro' });
     else escribir(p, 'Nombre', x, top + 42, c.normal, 7, { ancho: w, alin: 'centro', color: GRIS });
-    escribir(p, 'ID:', x, top + 56, c.normal, 8);
-    linea(p, x + 14, top + 58, x + 110, top + 58, 0.4, GRIS);
-    escribir(p, 'Fecha:', x + 130, top + 56, c.normal, 8);
-    linea(p, x + 160, top + 58, x + w, top + 58, 0.4, GRIS);
   });
 }
 

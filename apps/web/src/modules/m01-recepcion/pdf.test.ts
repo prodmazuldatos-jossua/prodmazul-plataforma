@@ -32,7 +32,8 @@ describe('ayudas del PDF', () => {
     expect(pesoTexto(1234.5, 'lb')).toBe('1,234.50');
     expect(pesoTexto(220.462, 'kg')).toBe('100.00');
     expect(pesoTexto(null, 'lb')).toBe('');
-    expect(temperaturaTexto(3.456)).toBe('3.46');
+    expect(temperaturaTexto(3.456)).toBe('3.5');
+    expect(temperaturaTexto(-3)).toBe('-3.0');
   });
   it('promedio por bloque ignora las gavetas vacías', () => {
     const g = [{ num_gaveta: 1, peso_lb: 10 }, { num_gaveta: 2, peso_lb: 20 }, { num_gaveta: 11, peso_lb: 30 }];

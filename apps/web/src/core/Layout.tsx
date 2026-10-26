@@ -47,7 +47,8 @@ export default function Layout() {
   }, [menuAbierto]);
 
   const modulo = modulos.find((m) => pathname === m.ruta || pathname.startsWith(`${m.ruta}/`));
-  const titulo = pathname === '/' ? 'Inicio' : pathname.startsWith('/cuenta') ? 'Mi cuenta' : modulo?.nombre ?? 'Prodmazul';
+  const titulo = pathname === '/' ? 'Inicio' : pathname.startsWith('/cuenta') ? 'Mi cuenta' : pathname.startsWith('/admin/usuarios') ? 'Usuarios' : modulo?.nombre ?? 'Prodmazul';
+  const esAdmin = perfil?.es_admin_general === true;
   const nombre = perfil?.nombre?.trim() || perfil?.correo || '';
 
   return (
@@ -87,7 +88,8 @@ export default function Layout() {
           <nav aria-label="Principal">
             <NavLink to="/" end><Icono nombre="inicio" tamano={22} />Inicio</NavLink>
             {modulos.map((m) => <NavLink key={m.modulo_id} to={m.ruta}><Icono nombre={iconoDeModulo(m.modulo_id)} tamano={22} />{m.nombre}</NavLink>)}
-            <NavLink to="/cuenta/clave"><Icono nombre="candado" tamano={22} />Cambiar mi contraseña</NavLink>
+            {esAdmin && <NavLink to="/admin/usuarios"><Icono nombre="usuarios" tamano={22} />Usuarios</NavLink>}
+            {esAdmin && <NavLink to="/cuenta/clave"><Icono nombre="candado" tamano={22} />Cambiar mi contraseña</NavLink>}
           </nav>
           <div className="menu-pie">
             <button className="boton-peligro" onClick={() => void cerrarSesion()}><Icono nombre="salir" tamano={20} />Cerrar sesión</button>

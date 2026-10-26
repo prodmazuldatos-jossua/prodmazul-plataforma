@@ -54,7 +54,7 @@ describe('capacidades', () => {
   const solo = (...p: string[]) => (x: string) => p.includes(x);
   it('el autor operativo edita y anula su borrador, pero no elimina', () => {
     const c = capacidades({ estado: 'borrador', creado_por: 'u1' }, 'u1', solo('ver', 'crear', 'editar', 'anular'));
-    expect(c).toEqual({ editar: true, anular: true, eliminar: false, reactivar: false });
+    expect(c).toEqual({ editar: true, devolver: false, anular: true, eliminar: false, reactivar: false });
   });
   it('otro operativo no edita ni anula lo ajeno', () => {
     const c = capacidades({ estado: 'cerrado', creado_por: 'u1' }, 'u2', solo('ver', 'editar', 'anular'));
@@ -62,13 +62,13 @@ describe('capacidades', () => {
     expect(c.anular).toBe(false);
   });
   it('el administrador hace todo según el estado', () => {
-    expect(capacidades({ estado: 'cerrado', creado_por: 'u1' }, 'u9', todos)).toEqual({ editar: true, anular: true, eliminar: true, reactivar: false });
-    expect(capacidades({ estado: 'anulado', creado_por: 'u1' }, 'u9', todos)).toEqual({ editar: false, anular: false, eliminar: true, reactivar: true });
-    expect(capacidades({ estado: 'eliminado', creado_por: 'u1' }, 'u9', todos)).toEqual({ editar: false, anular: false, eliminar: false, reactivar: true });
+    expect(capacidades({ estado: 'cerrado', creado_por: 'u1' }, 'u9', todos)).toEqual({ editar: true, devolver: true, anular: true, eliminar: true, reactivar: false });
+    expect(capacidades({ estado: 'anulado', creado_por: 'u1' }, 'u9', todos)).toEqual({ editar: false, devolver: false, anular: false, eliminar: true, reactivar: true });
+    expect(capacidades({ estado: 'eliminado', creado_por: 'u1' }, 'u9', todos)).toEqual({ editar: false, devolver: false, anular: false, eliminar: false, reactivar: true });
   });
   it('consulta no puede nada', () => {
     expect(capacidades({ estado: 'borrador', creado_por: 'u1' }, 'u1', solo('ver', 'ver_reportes')))
-      .toEqual({ editar: false, anular: false, eliminar: false, reactivar: false });
+      .toEqual({ editar: false, devolver: false, anular: false, eliminar: false, reactivar: false });
   });
   it('sin usuario conocido no se es autor', () => {
     expect(capacidades({ estado: 'borrador', creado_por: null }, undefined, solo('editar')).editar).toBe(false);
@@ -81,5 +81,15 @@ describe('paginacion', () => {
     expect(paginacion(45, 0, 20)).toEqual({ pagina: 1, paginas: 3 });
     expect(paginacion(45, 40, 20)).toEqual({ pagina: 3, paginas: 3 });
     expect(paginacion(40, 20, 20)).toEqual({ pagina: 2, paginas: 2 });
+  });
+});
+
+describe('devolver a borrador', () => {
+  const solo = (...p: string[]) => (x: string) => p.includes(x);
+  it('solo una recepción cerrada, por su autor o por quien puede eliminar', () => {
+    expect(capacidades({ estado: 'cerrado', creado_por: 'u1' }, 'u1', solo('ver', 'editar')).devolver).toBe(true);
+    expect(capacidades({ estado: 'cerrado', creado_por: 'u1' }, 'u2', solo('ver', 'editar')).devolver).toBe(false);
+    expect(capacidades({ estado: 'borrador', creado_por: 'u1' }, 'u1', solo('ver', 'editar')).devolver).toBe(false);
+    expect(capacidades({ estado: 'cerrado', creado_por: 'u1' }, 'u1', solo('ver')).devolver).toBe(false);
   });
 });

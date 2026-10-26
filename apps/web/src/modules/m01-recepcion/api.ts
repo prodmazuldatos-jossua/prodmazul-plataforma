@@ -42,6 +42,9 @@ export const anularRecepcion = (id: string, motivo: string, version: number) =>
   llamar<RespuestaEstado>('api_m01_anular', { p_id: id, p_motivo: motivo, p_version: version });
 export const eliminarRecepcion = (id: string, motivo: string, version: number) =>
   llamar<RespuestaEstado>('api_m01_eliminar', { p_id: id, p_motivo: motivo, p_version: version });
+export const devolverABorrador = (id: string, motivo: string, version: number) =>
+  llamar<RespuestaEstado>('api_m01_devolver_a_borrador', { p_id: id, p_motivo: motivo, p_version: version });
+
 export const reactivarRecepcion = (id: string, version: number) =>
   llamar<RespuestaEstado>('api_m01_reactivar', { p_id: id, p_version: version });
 

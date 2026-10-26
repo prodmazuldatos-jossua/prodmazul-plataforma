@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth, CLAVE_MINIMA } from './AuthContext';
-import { Alerta } from '../ui';
+import { Alerta, Vacio } from '../ui';
 
 export default function PaginaCambiarClave() {
-  const { cambiarClave } = useAuth();
+  const { cambiarClave, perfil } = useAuth();
   const [actual, setActual] = useState('');
   const [nueva, setNueva] = useState('');
   const [repite, setRepite] = useState('');
@@ -22,6 +22,15 @@ export default function PaginaCambiarClave() {
     } catch (err) { setError((err as Error).message); }
     finally { setEnviando(false); }
   };
+
+  // Solo el administrador general cambia su propia contraseña; la de los demás usuarios la define él.
+  if (!perfil?.es_admin_general) {
+    return (
+      <Vacio titulo="Tu contraseña la cambia el administrador">
+        <p>Si necesitas una contraseña nueva, pídesela al administrador.</p>
+      </Vacio>
+    );
+  }
 
   return (
     <>

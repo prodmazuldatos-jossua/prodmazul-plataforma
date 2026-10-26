@@ -36,7 +36,8 @@ interface TemperaturaProps {
   id: string; value: number | null; onChange: (v: number | null) => void; error?: string; etiqueta?: string; etiquetaAria?: string;
 }
 
-const formatoTemp = (v: number | null) => (v === null ? '' : String(v));
+/** Siempre con un decimal: -3.0, 2.5, 0.0 (igual que se guarda). */
+export const formatoTemp = (v: number | null) => (v === null ? '' : v.toFixed(1));
 
 /**
  * Temperatura en °C con botón ± (los teclados numéricos de las tabletas no traen el signo menos).
@@ -88,12 +89,14 @@ interface ConmutadorProps<T extends string> {
   onChange: (v: T) => void;
   ariaLabel: string;
   idBase: string;
+  /** Versión más pequeña, para ponerlo al lado de otro elemento. */
+  compacto?: boolean;
 }
 
 /** Interruptor de dos (o más) opciones, grande y táctil, con el mismo aspecto que Lb / Kg. */
-export function Conmutador<T extends string>({ opciones, valor, onChange, ariaLabel, idBase }: ConmutadorProps<T>) {
+export function Conmutador<T extends string>({ opciones, valor, onChange, ariaLabel, idBase, compacto }: ConmutadorProps<T>) {
   return (
-    <div className="interruptor" role="group" aria-label={ariaLabel}>
+    <div className={`interruptor${compacto ? ' interruptor-compacto' : ''}`} role="group" aria-label={ariaLabel}>
       {opciones.map((o) => (
         <button type="button" key={o.valor} id={`${idBase}-${o.valor}`} className={valor === o.valor ? 'activo' : ''}
                 aria-pressed={valor === o.valor} onClick={() => onChange(o.valor)}>{o.texto}</button>

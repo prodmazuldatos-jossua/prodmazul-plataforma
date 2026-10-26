@@ -8,7 +8,7 @@ import { textoCantidad } from '../../lib/texto';
 import { useUnidad } from '../../lib/unidades';
 import { descargarPdfRecepcion } from './pdfDescarga';
 import { useOnline } from '../../lib/conexion';
-import { anularRecepcion, eliminarRecepcion, obtenerRecepcion, reactivarRecepcion } from './api';
+import { anularRecepcion, devolverABorrador, eliminarRecepcion, obtenerRecepcion, reactivarRecepcion } from './api';
 import { pesoPromedio, redondear } from './calculos';
 import GaleriaFotos from './GaleriaFotos';
 import InsigniaEstado from './InsigniaEstado';
@@ -16,13 +16,14 @@ import { capacidades } from './mapeo';
 import type { RecepcionDetalle } from './tipos';
 import { Icono } from '../../core/iconos';
 
-type Accion = 'anular' | 'eliminar' | 'reactivar';
+type Accion = 'anular' | 'eliminar' | 'reactivar' | 'devolver';
 const MOTIVO_MIN = 5;
 const MOTIVO_MAX = 500;
 
 const TEXTOS: Record<Accion, { titulo: string; boton: string; ayuda: string }> = {
   anular: { titulo: 'Anular recepción', boton: 'Anular recepción', ayuda: 'La recepción queda anulada: no se edita y no cuenta en los reportes. Un administrador puede reactivarla.' },
   eliminar: { titulo: 'Eliminar recepción', boton: 'Eliminar recepción', ayuda: 'La recepción deja de verse en los listados normales. No se borra de la base de datos y un administrador puede reactivarla.' },
+  devolver: { titulo: 'Devolver a borrador', boton: 'Devolver a borrador', ayuda: 'La recepción deja de estar cerrada y vuelve a ser un borrador: podrás editarla y guardarla de nuevo. Queda registrado quién lo hizo y por qué. El lote conserva su estado (abierto o cerrado).' },
   reactivar: { titulo: 'Reactivar recepción', boton: 'Reactivar recepción', ayuda: 'La recepción vuelve al estado que tenía antes.' },
 };
 
@@ -103,8 +104,9 @@ export default function DetalleRecepcion() {
     try {
       if (accion === 'anular') await anularRecepcion(r.recepcion_id, motivo.trim(), r.version);
       else if (accion === 'eliminar') await eliminarRecepcion(r.recepcion_id, motivo.trim(), r.version);
+      else if (accion === 'devolver') await devolverABorrador(r.recepcion_id, motivo.trim(), r.version);
       else await reactivarRecepcion(r.recepcion_id, r.version);
-      const hecho = { anular: 'La recepción quedó anulada.', eliminar: 'La recepción quedó eliminada.', reactivar: 'La recepción fue reactivada.' }[accion];
+      const hecho = { anular: 'La recepción quedó anulada.', eliminar: 'La recepción quedó eliminada.', reactivar: 'La recepción fue reactivada.', devolver: 'La recepción volvió a borrador: ya puedes editarla.' }[accion];
       cerrarModal();
       setAviso(hecho);
       await cargar();
@@ -139,12 +141,13 @@ export default function DetalleRecepcion() {
           {cap.editar && (online
             ? <Link className="boton-primario enlace-boton" to={`/m01/${r.recepcion_id}/editar`}><Icono nombre="editar" />Editar</Link>
             : <button type="button" className="boton-primario" disabled><Icono nombre="editar" />Editar</button>)}
+          {cap.devolver && <button type="button" className="boton-secundario" disabled={!online} data-testid="boton-devolver" onClick={() => setAccion('devolver')}><Icono nombre="reactivar" />Devolver a borrador</button>}
           {cap.anular && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('anular')}><Icono nombre="anular" />Anular</button>}
           {cap.reactivar && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('reactivar')}><Icono nombre="reactivar" />Reactivar</button>}
           {cap.eliminar && <button type="button" className="boton-peligro" disabled={!online} onClick={() => setAccion('eliminar')}><Icono nombre="papelera" />Eliminar</button>}
         </div>
       </div>
-      {!online && (cap.editar || cap.anular || cap.reactivar || cap.eliminar) && (
+      {!online && (cap.editar || cap.devolver || cap.anular || cap.reactivar || cap.eliminar) && (
         <p className="ayuda" data-testid="aviso-sin-red-acciones">Sin conexión: editar, anular, eliminar y reactivar necesitan señal. Vuelven a activarse solos cuando regrese.</p>
       )}
 
@@ -214,7 +217,7 @@ export default function DetalleRecepcion() {
                 <thead><tr><th>Bin</th><th>Sellos recepción</th><th>Sellos almacenamiento</th><th className="num">Temp. °C</th><th className="num">Libras aprox.</th></tr></thead>
                 <tbody>{r.almacenamiento.map((a) => (
                   <tr key={a.num_bin}><td>{a.num_bin}</td><td>{a.sellos_recepcion || '—'}</td><td>{a.sellos_almacenamiento || '—'}</td>
-                    <td className="num">{a.temperatura_c === null ? '—' : Number(a.temperatura_c).toFixed(1)}</td>
+                    <td className="num">{a.temperatura_c === null ? '—' : `${Number(a.temperatura_c).toFixed(1)} °C`}</td>
                     <td className="num">{a.libras_aprox === null ? '—' : peso(Number(a.libras_aprox))}</td></tr>
                 ))}</tbody>
               </table>
