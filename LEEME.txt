@@ -1,12 +1,12 @@
-Fase 5 - Parte 3: Exportador programado cada 2 horas
+Fase 5 - Parte 4: Respaldo de fotos en Drive
 Archivos nuevos:
-  supabase/migrations/20261020000014_sync_programacion.sql   (migracion 14)
-  supabase/functions/sync-exportar/index.ts + nucleo.ts      (Edge Function; se despliega con --no-verify-jwt)
-  docs/prueba_parte3_f5.sql           (prueba que se pega en el SQL Editor de Supabase)
-  docs/consultas_exportador.sql       (consultas listas para ver y manejar el exportador)
-  tests/sql/fase5_parte3.mjs          (prueba automatica de la base, opcional)
-  tests/exportador/                   (prueba automatica del exportador contra un Google simulado, opcional)
-Archivo actualizado (prueba antigua):
-  tests/sql/parte1.mjs                (acepta las tablas nuevas del nucleo)
-No cambia la aplicacion web. Los secretos (URL y token del receptor, secreto del exportador) NO estan en ningun archivo:
-se guardan en el panel de Supabase (Edge Functions > Secrets y Vault).
+  supabase/migrations/20261020000015_sync_fotos_drive.sql   (migracion 15)
+  docs/prueba_parte4_f5.sql           (prueba que se pega en el SQL Editor de Supabase; no deja datos)
+  tests/sql/fase5_parte4.mjs          (prueba automatica de la base, opcional)
+Archivos actualizados:
+  apps-script/Codigo.gs               (receptor version 2.1: guardar_fotos y contar_fotos; se vuelve a pegar y publicar)
+  supabase/functions/sync-exportar/   (index.ts + nucleo.ts: fase de fotos; se vuelve a desplegar)
+  docs/consultas_exportador.sql       (consultas nuevas de fotos: 18 a 25)
+  tests/exportador/, apps-script/tests/ (pruebas automaticas, opcionales)
+No cambia la aplicacion web. La carpeta de Drive debe quedar en acceso «Restringido»: si tiene un enlace compartido el receptor se niega a guardar fotos.
+Los secretos siguen sin estar en ningun archivo.

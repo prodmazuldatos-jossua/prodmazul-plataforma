@@ -1,4 +1,4 @@
-// Prodmazul · Fase 5 · Parte 3 · Exportador a Google (Edge Function «sync-exportar»).
+// Prodmazul · Fase 5 · Partes 3 y 4 · Exportador (datos y fotos) a Google (Edge Function «sync-exportar»).
 // Despliegue:  supabase functions deploy sync-exportar --no-verify-jwt
 // (la verificación del que llama se hace aquí dentro con el secreto SYNC_SECRETO; no usa la clave de administración de Supabase).
 // Secretos que necesita (se guardan en el panel de Supabase, NUNCA en el código ni en Git):
@@ -35,6 +35,10 @@ Deno.serve(async (req) => {
     ahora: () => Date.now(),
     env: (n) => Deno.env.get(n),
     log: (m) => console.log(m),
+    firmar: async (ruta, segundos) => {
+      const { data, error } = await sb.storage.from('m01-recepcion-fotos').createSignedUrl(ruta, segundos);
+      return error || !data?.signedUrl ? { error: error?.message ?? 'sin dirección' } : { url: data.signedUrl };
+    },
   };
 
   if (cuerpo.accion === 'ping') return responder(await probarGoogle(deps));

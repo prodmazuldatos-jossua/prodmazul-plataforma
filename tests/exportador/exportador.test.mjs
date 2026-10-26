@@ -1,4 +1,4 @@
-// Pruebas del exportador (Fase 5 · Parte 3): base de datos real simulada (PGlite, con las migraciones 1 a 14)
+// Pruebas del exportador (Fase 5 · Partes 3 y 4): base de datos real simulada (PGlite, con las migraciones 1 a 15)
 // + la lógica de la función sync-exportar + el receptor de Google (Codigo.gs) en su simulación.
 // Ejecutar:  node --import ./registrar.mjs exportador.test.mjs
 import { PGlite } from '@electric-sql/pglite';
@@ -27,7 +27,7 @@ await db.exec(`
   create function auth.uid() returns uuid language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.sub', true),''), nullif(current_setting('request.jwt.sub', true),''))::uuid $$;
   create schema storage;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
-  create table storage.objects (id uuid default gen_random_uuid(), bucket_id text, name text);
+  create table storage.objects (id uuid default gen_random_uuid(), bucket_id text, name text, metadata jsonb);
   grant usage on schema public to anon, authenticated;
   -- doble mínimo de pg_cron, pg_net y Vault (en Supabase son los reales)
   create schema cron;
@@ -76,7 +76,7 @@ function nuevoGoogle() {
   const R = crearEntorno({ ahora: new Date().toISOString() });
   const base = R.nuevoLibro('Prodmazul_Respaldo_' + new Date().getFullYear());
   base.insertSheet('_conexion');
-  R.props.TOKEN = TOKEN; R.props.SHEET_ID = base.id; R.props.FOLDER_ID = '1carpeta';
+  R.props.TOKEN = TOKEN; R.props.SHEET_ID = base.id; R.raizFotos = R.nuevaCarpeta('Prodmazul_Respaldo_Fotos'); R.props.FOLDER_ID = R.raizFotos.id;
   R.base = base; R.llamadas = 0; R.lotes = [];
   return R;
 }
@@ -358,7 +358,7 @@ console.log('\nExportador · configuración incompleta y ejecuciones simultánea
   t('los lotes de las dos ejecuciones suman lo enviado', G.lotes.length - llamadasAntes === a.lotes + b.lotes);
 
   const p = await probarGoogle(deps());
-  t('la prueba de conexión (ping) devuelve la versión del receptor', p.ok === true && p.version === '2.0', JSON.stringify(p));
+  t('la prueba de conexión (ping) devuelve la versión del receptor', p.ok === true && p.version === '2.1', JSON.stringify(p));
   entorno = { ...guardado, APPS_SCRIPT_TOKEN: 'X'.repeat(40) };
   const p2 = await probarGoogle(deps());
   t('el ping con token malo informa «no autorizado»', p2.ok === false && /no autorizado/.test(p2.error));
@@ -387,6 +387,163 @@ console.log('\nFunción sync-exportar (entrada, secreto y respuestas)');
   r = await pedir('POST', { 'x-sync-secreto': SECRETO }, { origen: 'cron' });
   t('con el secreto correcto responde 200 con un resultado (aquí el doble de Supabase no tiene base)', r.estado === 200 && typeof r.json.ok === 'boolean');
   t('la respuesta de error nunca incluye secretos', !JSON.stringify(r.json).includes(TOKEN) && !JSON.stringify(r.json).includes(SECRETO));
+}
+
+// ---------------------------------------------------------------- 8) respaldo de fotos en Drive (Parte 4)
+console.log('\nRespaldo de fotos en Drive (Parte 4)');
+{
+  await limpiarCola();
+  G = nuevoGoogle();
+  const jpg = (n, sem = 7) => { const b = Buffer.alloc(n, sem); b[0] = 0xFF; b[1] = 0xD8; b[2] = 0xFF; b[3] = 0xE0; return b; };
+  let descargas = [];
+  G.red = (u) => { descargas.push(u); return { codigo: 200, bytes: jpg(1200) }; };
+  const firmar = async (ruta) => ({ url: `https://abcd1234.supabase.co/storage/v1/object/sign/m01-recepcion-fotos/${ruta}?token=eyJhbGciOi.JIUzI1NiIs_x-y` });
+  const dd = (extra = {}) => deps({ firmar, ...extra });
+  const hoy = new Date().toISOString().slice(0, 10);
+  const rec = { estado: 'cerrado', fecha_llegada: hoy, lote_id: '995-995-995', proveedor: 'PROVEEDOR 1', especie: 'LANGOSTINO', num_gavetas_bines: 1, libras_reportadas: 100, libras_planta: 99, guia_remision: 'G-F4',
+    gavetas: [{ num_gaveta: 1, peso_lb: 99 }], client_uuid: '22222222-2222-4222-8222-222222222222' };
+  const gr = await comoUsuario(ADMIN, `select public.api_m01_guardar_recepcion('${JSON.stringify(rec)}'::jsonb)`);
+  const rid = gr.data?.recepcion_id;
+  t('hay una recepción de prueba para las fotos', gr.error === null && !!rid, gr.error);
+  let contadorRuta = 0;
+  const nuevaFoto = async (nn, { confirmada = true, purgada = false, bytes = 1200, rid2 = rid } = {}) => {
+    const fid = `FOT-M01-995-995-995-${rid2}-${String(nn).padStart(2, '0')}`; const ruta = `M01/995-995-995/${rid2}/${fid}-abc${nn}${++contadorRuta}.jpg`;
+    await db.query(`insert into m01_recepcion.fotos_meta (foto_id, recepcion_id, lote_id, nn, ruta, nombre, tipo_mime, tamano_bytes, confirmada, purgada_supabase_en)
+                    values ($1,$2,'995-995-995',$3,$4,'f.jpg','image/jpeg',$5,$6,$7)`, [fid, rid2, nn, ruta, bytes, confirmada, purgada ? new Date().toISOString() : null]);
+    await db.query(`delete from storage.objects where name = $1`, [ruta]);
+    await db.query(`insert into storage.objects (bucket_id, name, metadata) values ('m01-recepcion-fotos', $1, $2)`, [ruta, JSON.stringify({ size: bytes })]);
+    return { fid, ruta };
+  };
+  const f1 = await nuevaFoto(1), f2 = await nuevaFoto(2), f3 = await nuevaFoto(3), fSin = await nuevaFoto(4, { confirmada: false }), fPur = await nuevaFoto(5, { purgada: true });
+  const driveDe = async (fid) => (await q(`select drive_file_id, respaldo_drive_en from m01_recepcion.fotos_meta where foto_id = $1`, [fid]))[0];
+  const carp = () => ['M01_Recepcion', hoy.slice(0, 4), hoy.slice(5, 7), rid].reduce((c, n) => (c ? c.sub.find((x) => x.nombre === n) : null), G.raizFotos);
+
+  // -- detectar pendientes
+  let pend = await rpc('sync_fotos_pendientes', { p_max: 10 });
+  t('detecta SOLO las fotos confirmadas, sin respaldo y no purgadas', pend.data.fotos.length === 3 && pend.data.pendientes_total === 3 && !pend.data.fotos.some((x) => [fSin.fid, fPur.fid].includes(x.foto_id)), JSON.stringify(pend));
+  t('entrega el tamaño real guardado en Storage', pend.data.fotos.every((x) => Number(x.bytes_esperados) === 1200));
+  const rep = await rpc('sync_fotos_pendientes', { p_max: 10 });
+  t('mientras están reservadas no se entregan otra vez (nadie las duplica)', rep.data.vacio === true && rep.data.pendientes_total === 3);
+  await db.exec(`update core.sync_fotos set reservado_hasta = now() - interval '1 minute'`);
+  const rep2 = await rpc('sync_fotos_pendientes', { p_max: 2 });
+  t('si la reserva vence, se vuelven a entregar (con el intento contado)', rep2.data.fotos.length === 2 && rep2.data.fotos.every((x) => x.intento === 2));
+  await db.exec(`delete from core.sync_fotos`);
+  t('las funciones de fotos no se pueden llamar con la sesión de un usuario', (await comoUsuario(ADMIN, `select public.sync_fotos_pendientes(5)`)).error !== null && (await comoUsuario(ADMIN, `select public.sync_foto_marcar_ok('x','1234567890abc')`)).error !== null);
+
+  // -- sin firmar no hace nada
+  let r = await ejecutar(deps());
+  t('si la función no sabe firmar direcciones, no marca nada', r.ok && r.fotos === 0 && (await driveDe(f1.fid)).drive_file_id === null);
+
+  // -- flujo normal
+  r = await ejecutar(dd());
+  t('respalda las 3 fotos y lo informa', r.ok && r.fotos === 3 && r.fotos_error === 0 && r.quedan_fotos === 0, JSON.stringify(r));
+  const dr = await Promise.all([f1, f2, f3].map((f) => driveDe(f.fid)));
+  t('guarda drive_file_id y la fecha SOLO tras la confirmación de Drive', dr.every((x) => /^1\d+AbCdEf$/.test(x.drive_file_id) && x.respaldo_drive_en));
+  t('las no confirmadas y las purgadas no se tocan', (await driveDe(fSin.fid)).drive_file_id === null && (await driveDe(fPur.fid)).drive_file_id === null);
+  const c = carp();
+  t('en Drive quedan en M01_Recepcion/AAAA/MM/REC-…/foto_01..03.jpg', !!c && c.arch.map((a) => a.nombre).sort().join() === 'foto_01.jpg,foto_02.jpg,foto_03.jpg', c?.arch.map((a) => a.nombre).join());
+  t('el archivo de Drive es idéntico al de Supabase', c.arch.every((a) => Buffer.compare(a.bytes, jpg(1200)) === 0));
+  t('el estado cuenta las fotos respaldadas y la cola de fotos queda vacía', Number((await est()).fotos_respaldadas) === 3 && (await q('select * from core.sync_fotos')).length === 0);
+  t('la ejecución registra fotos y fotos pendientes', (await q(`select fotos, fotos_error, quedan_fotos from core.sync_ejecuciones where ejecucion_id = ${r.ejecucion_id}`))[0].fotos === 3);
+  t('queda en la bitácora de auditoría', Number(await uno(`select count(*) from core.auditoria where accion = 'respaldar_foto'`)) === 3);
+  t('el drive_file_id llegó a la cola para el espejo en Sheets', Number(await uno(`select count(*) from core.sync_cola where tabla = 'm01_recepcion.fotos_meta'`)) > 0);
+
+  // -- sin duplicados
+  descargas = [];
+  r = await ejecutar(dd());
+  t('ejecutar de nuevo no vuelve a descargar ni a guardar nada', r.ok && r.fotos === 0 && descargas.length === 0 && carp().arch.length === 3);
+  await rpc('sync_foto_marcar_ok', { p_foto_id: f1.fid, p_drive_file_id: 'OTRO_ID_DIFERENTE_1234' });
+  t('confirmar dos veces la misma foto no cambia su identificador', (await driveDe(f1.fid)).drive_file_id === dr[0].drive_file_id);
+  const idViejo = dr[0].drive_file_id;
+  await db.query(`select core.sync_fotos_olvidar($1)`, [f1.fid]);
+  r = await ejecutar(dd());
+  t('si se pide repetir el respaldo, Drive REUTILIZA el archivo (no crea otro)', r.fotos === 1 && carp().arch.length === 3 && (await driveDe(f1.fid)).drive_file_id === idViejo && descargas.length === 0, JSON.stringify(r));
+
+  // -- fallos
+  await db.exec(`delete from m01_recepcion.fotos_meta where foto_id = '${f3.fid}'`);   // se borró en la app
+  t('borrar la foto en la app NO borra el respaldo en Drive', carp().arch.length === 3);
+  const f3b = await nuevaFoto(3);
+  G.red = () => ({ codigo: 404, bytes: [] });
+  r = await ejecutar(dd());
+  const e1 = (await q('select * from core.sync_fotos'))[0];
+  t('si la descarga falla: NO se marca respaldada y se anota el error', r.ok && r.fotos === 0 && r.fotos_error === 1 && (await driveDe(f3b.fid)).drive_file_id === null && e1.intentos === 1 && /404/.test(e1.ultimo_error), JSON.stringify(r));
+  t('el error no contiene la dirección firmada ni el token', !/token=|eyJhbGci/.test(e1.ultimo_error) && !JSON.stringify(r).includes('eyJhbGci'));
+  t('el estado muestra el último error de fotos', /404/.test((await est()).ultimo_error_foto));
+  r = await ejecutar(dd());
+  t('no reintenta de inmediato (espera entre intentos)', r.fotos === 0 && r.fotos_error === 0);
+  await db.exec(`update core.sync_fotos set proximo_intento_en = null`);
+  G.red = () => ({ codigo: 200, bytes: jpg(1200) });
+  r = await ejecutar(dd());
+  t('cuando el problema se corrige, el reintento la respalda', r.fotos === 1 && (await driveDe(f3b.fid)).drive_file_id !== null && (await q('select * from core.sync_fotos')).length === 0);
+
+  // foto cuyo tamaño en Storage no coincide con el descargado
+  await db.exec(`delete from m01_recepcion.fotos_meta where foto_id = '${fSin.fid}'`);
+  const f4b = await nuevaFoto(4, { bytes: 999 });
+  r = await ejecutar(dd());
+  t('si el tamaño descargado no coincide con el de Storage, no se respalda', r.fotos === 0 && r.fotos_error === 1 && (await driveDe(f4b.fid)).drive_file_id === null && /Tamano distinto/.test((await q('select ultimo_error from core.sync_fotos'))[0].ultimo_error));
+  await db.exec(`delete from m01_recepcion.fotos_meta where foto_id = '${f4b.fid}'`);
+
+  // firma que falla
+  await db.exec(`delete from m01_recepcion.fotos_meta where recepcion_id = '${rid}' and nn = 5`);
+  const f5c = await nuevaFoto(5);
+  r = await ejecutar(deps({ firmar: async () => ({ error: 'Object not found' }) }));
+  t('si no se puede crear la dirección temporal: error de esa foto y no se llama a Google', r.fotos_error === 1 && (await driveDe(f5c.fid)).drive_file_id === null && /dirección temporal/.test((await q('select ultimo_error from core.sync_fotos'))[0].ultimo_error));
+  await db.exec(`delete from core.sync_fotos`);
+
+  // Google devuelve «ok» sin resultado de la foto
+  const antes = G.lotes.length;
+  fallo = async (u, init) => { const c = JSON.parse(init.body); return new Response(JSON.stringify(c.accion === 'guardar_fotos' ? { ok: true, resultados: [] } : G.llamar(c)), { status: 200 }); };
+  r = await ejecutar(dd());
+  t('si el receptor no devuelve resultado para una foto, NO se marca respaldada', r.fotos === 0 && r.fotos_error === 1 && (await driveDe(f5c.fid)).drive_file_id === null);
+  // Google caído durante las fotos
+  await db.exec(`delete from core.sync_fotos`);
+  fallo = async (u, init) => { const c = JSON.parse(init.body); if (c.accion === 'guardar_fotos') return new Response('<html>Error</html>', { status: 500 }); return new Response(JSON.stringify(G.llamar(c)), { status: 200 }); };
+  r = await ejecutar(dd());
+  t('si Google falla en las fotos: error por foto, nada marcado, y los datos ya enviados no se pierden', r.fotos === 0 && r.fotos_error >= 1 && (await driveDe(f5c.fid)).drive_file_id === null);
+  fallo = null;
+  await db.exec(`delete from core.sync_fotos`);
+
+  // carpeta pública
+  G.raizFotos.acceso = 'ANYONE_WITH_LINK';
+  r = await ejecutar(dd());
+  const ep = (await q('select ultimo_error from core.sync_fotos'))[0];
+  t('si la carpeta de Drive tiene enlace compartido, NO se respalda nada', r.fotos === 0 && r.fotos_error >= 1 && /enlace compartido/.test(ep.ultimo_error) && (await driveDe(f5c.fid)).drive_file_id === null);
+  G.raizFotos.acceso = 'PRIVATE';
+  await db.exec(`update core.sync_fotos set proximo_intento_en = null`);
+
+  // agotadas
+  await db.exec(`update core.sync_fotos set intentos = 5, proximo_intento_en = null`);
+  const ag = await rpc('sync_fotos_pendientes', { p_max: 5 });
+  t('con 5 intentos fallidos la foto queda «agotada» y deja de intentarse', ag.data.vacio === true);
+  const es = await comoUsuario(ADMIN, `select public.api_sync_estado()`);
+  t('el administrador ve fotos agotadas, con error y respaldadas', es.data.fotos_agotadas === 1 && es.data.fotos_respaldadas === 3 && es.data.fotos_sin_respaldo === 1, JSON.stringify(es.data));
+  t('un usuario operativo no ve el estado', (await comoUsuario(OPER, `select public.api_sync_estado()`)).error !== null);
+  const rr = await comoUsuario(ADMIN, `select public.api_sync_reintentar_errores()`);
+  t('«reintentar errores» también reactiva las fotos agotadas', rr.data.fotos === 1 && (await q('select intentos from core.sync_fotos')).every((x) => x.intentos === 0), JSON.stringify(rr));
+  r = await ejecutar(dd());
+  t('y entonces se respalda', r.fotos === 1 && (await driveDe(f5c.fid)).drive_file_id !== null);
+
+  // muchas fotos: varias tandas
+  const rec2 = { ...rec, client_uuid: '33333333-3333-4333-8333-333333333333', guia_remision: 'G-F4B' };
+  const g2 = await comoUsuario(ADMIN, `select public.api_m01_guardar_recepcion('${JSON.stringify(rec2)}'::jsonb)`);
+  const rid2 = g2.data.recepcion_id;
+  for (let i = 1; i <= 5; i++) await nuevaFoto(i, { rid2 });
+  const rec3 = { ...rec, client_uuid: '44444444-4444-4444-8444-444444444444', guia_remision: 'G-F4C' };
+  const g3 = await comoUsuario(ADMIN, `select public.api_m01_guardar_recepcion('${JSON.stringify(rec3)}'::jsonb)`);
+  for (let i = 1; i <= 4; i++) await nuevaFoto(i, { rid2: g3.data.recepcion_id });
+  r = await ejecutar(dd());
+  t('9 fotos pendientes se respaldan en varias tandas de 5', r.fotos === 9 && r.quedan_fotos === 0 && r.detalle.filter((x) => /tanda/.test(x)).length === 2, JSON.stringify(r.detalle));
+  t('cada recepción tiene su propia carpeta en Drive', [rid2, g3.data.recepcion_id].every((x) => G.raizFotos.sub[0].sub[0].sub[0].sub.some((c) => c.nombre === x)));
+  t('el total en Drive coincide con el total en Supabase', G.llamar({ token: TOKEN, accion: 'contar_fotos', anio: Number(hoy.slice(0, 4)), mes: Number(hoy.slice(5, 7)) }).fotos === Number(await uno(`select count(*) from m01_recepcion.fotos_meta where drive_file_id is not null and to_char(subido_en,'YYYY-MM') = '${hoy.slice(0, 7)}'`)));
+
+  // tiempo
+  const f7 = await nuevaFoto(1, { rid2: (await comoUsuario(ADMIN, `select public.api_m01_guardar_recepcion('${JSON.stringify({ ...rec, client_uuid: '55555555-5555-4555-8555-555555555555', guia_remision: 'G-F4D' })}'::jsonb)`)).data.recepcion_id });
+  r = await ejecutar(dd(), { tope_nueva_tanda_ms: -1 });
+  t('si se acabó el tiempo, no empieza fotos y lo deja dicho', r.fotos === 0 && r.detalle.some((x) => /se detuvo por tiempo/.test(x)) && (await driveDe(f7.fid)).drive_file_id === null);
+  r = await ejecutar(dd());
+  t('la siguiente ejecución la retoma', r.fotos === 1);
+  r = await ejecutar(dd());
+  t('la cola de datos y la de fotos terminan vacías', (await cola('pendiente')) === 0 && Number(await uno(`select count(*) from core.sync_fotos`)) === 0);
 }
 
 console.log(`\nResultado: ${ok} correctas, ${mal} con fallo`);

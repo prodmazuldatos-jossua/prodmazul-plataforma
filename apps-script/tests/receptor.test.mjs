@@ -1,5 +1,6 @@
 // Pruebas de la LÓGICA del receptor (Codigo.gs) con una simulación de Google. Ejecutar: node receptor.test.mjs
 import { crearEntorno } from './mock_google.mjs';
+import crypto from 'crypto';
 
 let ok = 0, mal = 0;
 const t = (nombre, cond, extra = '') => { if (cond) { ok++; console.log('  ✔', nombre); } else { mal++; console.log('  ✘', nombre, extra); } };
@@ -9,7 +10,7 @@ function nuevo(opts) {
   const R = crearEntorno(opts);
   const base = R.nuevoLibro('Prodmazul_Respaldo_2026');
   base.insertSheet('_conexion');
-  R.props.TOKEN = TOKEN; R.props.SHEET_ID = base.id; R.props.FOLDER_ID = '1carpeta';
+  R.props.TOKEN = TOKEN; R.props.SHEET_ID = base.id; R.raizFotos = R.nuevaCarpeta('Prodmazul_Respaldo_Fotos'); R.props.FOLDER_ID = R.raizFotos.id;
   R.base = base;
   R.sync = (tablas, lote = 'lote-0001-prueba') => R.llamar({ token: TOKEN, accion: 'sincronizar', lote_id: lote, tablas });
   return R;
@@ -24,7 +25,7 @@ console.log('\nEntrada y token');
 {
   const R = nuevo();
   const p = R.llamar({ token: TOKEN, accion: 'ping' });
-  t('ping responde ok con la versión', p.ok === true && p.version === '2.0');
+  t('ping responde ok con la versión', p.ok === true && p.version === '2.1');
   t('token incorrecto: no autorizado', R.llamar({ token: 'falso', accion: 'ping' }).error === 'no autorizado');
   t('token de otro largo: no autorizado', R.llamar({ token: TOKEN + 'x', accion: 'ping' }).error === 'no autorizado');
   t('sin token: no autorizado', R.llamar({ accion: 'ping' }).error === 'no autorizado');
@@ -198,6 +199,153 @@ console.log('\nTabla ancha (recepciones tiene más de 26 columnas) y permisos');
   f.nueva = 'x'; const r2 = R.sync([tabla('recepciones', ['recepcion_id'], [f])]);
   t('y admite una columna nueva más', r2.ok === true && h.filas[0].length === 47 && h.filas[0][46] === 'sincronizado_en');
   t('autorizar() funciona con los servicios usados', R.ctx.autorizar().startsWith('Permisos correctos'));
+}
+
+
+console.log('\nFotos en Drive (Parte 4)');
+{
+  const jpg = (n, semilla = 7) => { const b = Buffer.alloc(n, semilla); b[0] = 0xFF; b[1] = 0xD8; b[2] = 0xFF; b[3] = 0xE0; return b; };
+  const png = (n) => { const b = Buffer.alloc(n, 3); [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A].forEach((x, i) => { b[i] = x; }); return b; };
+  const webp = (n) => { const b = Buffer.alloc(n, 4); Buffer.from('RIFF').copy(b, 0); Buffer.from('WEBP').copy(b, 8); return b; };
+  const urlDe = (ruta, bucket = 'm01-recepcion-fotos') => `https://abcd1234.supabase.co/storage/v1/object/sign/${bucket}/${ruta}?token=eyJhbGciOi.JIUzI1NiIs_x-y`;
+  const foto = (rec, nn, ruta, mime = 'image/jpeg', extra = {}) => ({
+    foto_id: `FOT-M01-995-995-995-${rec}-${String(nn).padStart(2, '0')}`, recepcion_id: rec, nn, ruta, tipo_mime: mime, url: urlDe(ruta), bytes_esperados: null, ...extra });
+  const GF = (R, fotos) => R.llamar({ token: TOKEN, accion: 'guardar_fotos', fotos });
+  const recCarpeta = (R, anio, mes, rec) => ['M01_Recepcion', anio, mes, rec].reduce((c, n) => (c ? c.sub.find((x) => x.nombre === n) : null), R.raizFotos);
+  const REC = 'REC-20261026-0001';
+
+  // -- una foto
+  let R = nuevo();
+  const b1 = jpg(1500);
+  R.red = () => ({ codigo: 200, bytes: b1 });
+  let r = GF(R, [foto(REC, 1, 'M01/995-995-995/' + REC + '/a1.jpg', 'image/jpeg', { bytes_esperados: 1500 })]);
+  const c1 = recCarpeta(R, '2026', '10', REC);
+  t('guarda la foto y responde con su identificador de Drive', r.ok === true && r.resultados[0].ok === true && /^1\d+AbCdEf$/.test(r.resultados[0].drive_file_id), JSON.stringify(r));
+  t('la deja en M01_Recepcion/AAAA/MM/REC-.../foto_01.jpg', !!c1 && c1.arch.length === 1 && c1.arch[0].nombre === 'foto_01.jpg');
+  t('devuelve el tamaño y la huella SHA-256 del archivo', r.resultados[0].bytes === 1500 && r.resultados[0].sha256 === crypto.createHash('sha256').update(b1).digest('hex'));
+  t('el contenido guardado es idéntico al descargado', Buffer.compare(c1.arch[0].bytes, b1) === 0);
+  t('la descripción guarda la ruta única de la foto (para no duplicar)', c1.arch[0].desc === 'M01/995-995-995/' + REC + '/a1.jpg');
+  t('descarga sin seguir redirecciones y sin lanzar error por códigos HTTP', R.descargas.length === 1 && R.descargas[0].opc.followRedirects === false && R.descargas[0].opc.muteHttpExceptions === true);
+
+  // -- reenviar la misma
+  const idPrimero = r.resultados[0].drive_file_id;
+  r = GF(R, [foto(REC, 1, 'M01/995-995-995/' + REC + '/a1.jpg')]);
+  t('reenviar la misma foto NO crea un segundo archivo y devuelve el mismo identificador', r.resultados[0].drive_file_id === idPrimero && r.resultados[0].reutilizada === true && c1.arch.length === 1);
+  t('y no vuelve a descargarla', R.descargas.length === 1);
+
+  // -- varias fotos y formatos
+  R.red = (u) => (u.includes('b2') ? { codigo: 200, bytes: png(900) } : { codigo: 200, bytes: webp(700) });
+  r = GF(R, [foto(REC, 2, 'M01/x/b2.png', 'image/png'), foto(REC, 3, 'M01/x/b3.webp', 'image/webp')]);
+  t('guarda PNG y WebP con su extensión', r.resultados.every((x) => x.ok) && c1.arch.map((a) => a.nombre).sort().join() === 'foto_01.jpg,foto_02.png,foto_03.webp', c1.arch.map((a) => a.nombre).join());
+
+  // -- foto reemplazada (mismo número, otra subida)
+  R.red = () => ({ codigo: 200, bytes: jpg(2000, 9) });
+  r = GF(R, [foto(REC, 1, 'M01/995-995-995/' + REC + '/a1-OTRA.jpg')]);
+  const nombres = c1.arch.map((a) => a.nombre);
+  t('si se reemplazó la foto, la anterior se conserva con otro nombre y la nueva es foto_01.jpg', r.resultados[0].ok && nombres.includes('foto_01.jpg') && nombres.some((n) => /^foto_01_anterior_\d{14}\.jpg$/.test(n)) && c1.arch.length === 4, nombres.join());
+  t('la foto nueva tiene el contenido nuevo', Buffer.compare(c1.arch.find((a) => a.nombre === 'foto_01.jpg').bytes, jpg(2000, 9)) === 0);
+
+  // -- errores por foto (no tumban a las demás)
+  R = nuevo();
+  R.red = (u) => {
+    if (u.includes('mal404')) return { codigo: 404, bytes: [] };
+    if (u.includes('vacia')) return { codigo: 200, bytes: [] };
+    if (u.includes('falsa')) return { codigo: 200, bytes: png(500) };
+    if (u.includes('grande')) return { codigo: 200, bytes: jpg(7 * 1024 * 1024) };
+    return { codigo: 200, bytes: jpg(600) };
+  };
+  r = GF(R, [foto(REC, 1, 'M01/x/ok.jpg'), foto(REC, 2, 'M01/x/mal404.jpg'), foto(REC, 3, 'M01/x/vacia.jpg'), foto(REC, 4, 'M01/x/falsa.jpg'), foto(REC, 5, 'M01/x/grande.jpg')]);
+  const e = r.resultados;
+  t('un lote mixto: la buena se guarda y las malas informan su error', e[0].ok === true && e.slice(1).every((x) => x.ok === false), JSON.stringify(e));
+  t('error HTTP al descargar', /respondio 404/.test(e[1].error));
+  t('archivo vacío', /tamano no valido/.test(e[2].error));
+  t('un PNG enviado como JPEG se rechaza', /no es una imagen image\/jpeg/.test(e[3].error));
+  t('un archivo de más de 6 MB se rechaza', /tamano no valido/.test(e[4].error));
+  t('las fotos con error NO dejan archivos en Drive', recCarpeta(R, '2026', '10', REC).arch.length === 1);
+
+  R.red = () => ({ codigo: 200, bytes: jpg(1000) });
+  r = GF(R, [foto('REC-20261026-0002', 1, 'M01/x/t.jpg', 'image/jpeg', { bytes_esperados: 1001 })]);
+  t('si el tamaño descargado no coincide con el de Supabase, se rechaza', r.resultados[0].ok === false && /Tamano distinto/.test(r.resultados[0].error) && !recCarpeta(R, '2026', '10', 'REC-20261026-0002')?.arch.length);
+
+  // -- validaciones: todo o nada, y nada se descarga
+  R = nuevo(); R.red = () => ({ codigo: 200, bytes: jpg(100) });
+  const bueno = foto(REC, 1, 'M01/x/v.jpg');
+  const malos = {
+    'dirección http': { ...bueno, url: bueno.url.replace('https', 'http') },
+    'otro dominio': { ...bueno, url: 'https://malo.example.com/storage/v1/object/sign/m01-recepcion-fotos/x.jpg?token=abc' },
+    'otro bucket': { ...bueno, url: urlDe('x.jpg', 'otro-bucket') },
+    'sin token': { ...bueno, url: 'https://abcd1234.supabase.co/storage/v1/object/sign/m01-recepcion-fotos/x.jpg' },
+    'dirección interna': { ...bueno, url: 'https://169.254.169.254/storage/v1/object/sign/m01-recepcion-fotos/x.jpg?token=abc' },
+    'supabase.co como parte de otro dominio': { ...bueno, url: 'https://abcd.supabase.co.malo.com/storage/v1/object/sign/m01-recepcion-fotos/x.jpg?token=abc' },
+    'foto_id inválido': { ...bueno, foto_id: 'cualquier cosa' },
+    'recepción inválida': { ...bueno, recepcion_id: 'REC-2026-1' },
+    'foto de otra recepción': { ...bueno, foto_id: 'FOT-M01-995-995-995-REC-20261026-0099-01' },
+    'nn fuera de rango': { ...bueno, nn: 6, foto_id: 'FOT-M01-995-995-995-' + REC + '-06' },
+    'nn que no coincide': { ...bueno, nn: 2 },
+    'tipo no permitido': { ...bueno, tipo_mime: 'application/pdf' },
+    'año fuera de rango': { ...foto('REC-19991201-0001', 1, 'M01/x/v.jpg') },
+    'ruta vacía': { ...bueno, ruta: '' },
+    'bytes absurdos': { ...bueno, bytes_esperados: 999999999 }
+  };
+  let todos = true; let detalle = '';
+  for (const [nombre, f] of Object.entries(malos)) {
+    const x = GF(R, [bueno, f]);
+    if (!(x.ok === false && x.tipo === 'solicitud')) { todos = false; detalle += nombre + ' '; }
+  }
+  t('15 solicitudes malas se rechazan enteras (incluso con una foto buena junto a la mala)', todos, detalle);
+  t('y nada se descargó ni se creó en Drive', R.descargas.length === 0 && R.raizFotos.sub.length === 0);
+  t('lista vacía o de más de 10: se rechaza', GF(R, []).ok === false && GF(R, Array.from({ length: 11 }, () => bueno)).ok === false);
+  t('sin lista de fotos: se rechaza', R.llamar({ token: TOKEN, accion: 'guardar_fotos' }).ok === false);
+  t('token incorrecto: no autorizado y sin descargas', R.llamar({ token: 'x', accion: 'guardar_fotos', fotos: [bueno] }).error === 'no autorizado' && R.descargas.length === 0);
+
+  // -- carpeta pública / mal configurada
+  R.raizFotos.acceso = 'ANYONE_WITH_LINK';
+  const x_ = GF(R, [bueno]);
+  t('si la carpeta tiene enlace compartido, NO guarda nada', x_.ok === false && /enlace compartido/.test(x_.error) && R.descargas.length === 0);
+  R.raizFotos.acceso = 'DOMAIN';
+  t('tampoco si es visible para todo el dominio', GF(R, [bueno]).ok === false);
+  R.raizFotos.acceso = 'PRIVATE';
+  t('con la carpeta privada sí guarda', GF(R, [bueno]).resultados[0].ok === true);
+  delete R.props.FOLDER_ID;
+  t('sin FOLDER_ID: error claro', /FOLDER_ID/.test(GF(R, [bueno]).error));
+  R.props.FOLDER_ID = 'no-existe';
+  t('con un FOLDER_ID que no existe: error claro', /No se encontro la carpeta|No se encontró la carpeta/.test(GF(R, [bueno]).error));
+  R.props.FOLDER_ID = R.raizFotos.id; R.raizFotos.papelera = true;
+  t('con la carpeta en la papelera: error claro', /papelera/.test(GF(R, [bueno]).error));
+  R.raizFotos.papelera = false;
+
+  // -- otro año/mes
+  R = nuevo(); R.red = () => ({ codigo: 200, bytes: jpg(300) });
+  r = GF(R, [foto('REC-20251201-0007', 2, 'M01/x/y.jpg')]);
+  t('una recepción de diciembre de 2025 va a …/2025/12/REC-20251201-0007', r.resultados[0].ok && !!recCarpeta(R, '2025', '12', 'REC-20251201-0007'));
+
+  // -- tiempo
+  R = nuevo();
+  R.red = () => { R.avanzar(250000); return { codigo: 200, bytes: jpg(200) }; };
+  r = GF(R, [foto(REC, 1, 'M01/x/t1.jpg'), foto(REC, 2, 'M01/x/t2.jpg'), foto(REC, 3, 'M01/x/t3.jpg')]);
+  t('si se acaba el tiempo, las fotos que no alcanzó se marcan «pendiente» (sin error grave)', r.resultados[0].ok === true && r.resultados[1].pendiente === true && r.resultados[2].pendiente === true, JSON.stringify(r.resultados.map((x) => x.pendiente || x.ok)));
+
+  // -- contar fotos
+  R = nuevo(); R.red = () => ({ codigo: 200, bytes: jpg(200) });
+  GF(R, [foto('REC-20261001-0001', 1, 'M01/x/c1.jpg'), foto('REC-20261001-0001', 2, 'M01/x/c2.jpg')]);
+  GF(R, [foto('REC-20261002-0002', 1, 'M01/x/c3.jpg')]);
+  GF(R, [foto('REC-20261102-0003', 1, 'M01/x/c4.jpg')]);
+  GF(R, [foto('REC-20261001-0001', 1, 'M01/x/c1-nueva.jpg')]);   // reemplazo: deja una «anterior» que NO se cuenta
+  let n = R.llamar({ token: TOKEN, accion: 'contar_fotos', anio: 2026, mes: 10 });
+  t('cuenta las fotos y recepciones del mes (sin contar las «anterior»)', n.ok && n.recepciones === 2 && n.fotos === 3 && n.completo === true, JSON.stringify(n));
+  recCarpeta(R, '2026', '10', 'REC-20261002-0002').arch[0].papelera = true;
+  n = R.llamar({ token: TOKEN, accion: 'contar_fotos', anio: 2026, mes: 10 });
+  t('no cuenta lo que está en la papelera', n.fotos === 2);
+  n = R.llamar({ token: TOKEN, accion: 'contar_fotos', anio: 2026, mes: 3 });
+  t('un mes sin fotos da 0', n.ok && n.fotos === 0 && n.recepciones === 0);
+  t('mes inválido: se rechaza', R.llamar({ token: TOKEN, accion: 'contar_fotos', anio: 2026, mes: 13 }).ok === false);
+
+  // -- estado
+  const es = R.llamar({ token: TOKEN, accion: 'estado' });
+  t('el estado informa la carpeta de fotos y que es privada', es.fotos.configurada === true && es.fotos.privada === true && es.fotos.carpeta === 'Prodmazul_Respaldo_Fotos');
+  R.raizFotos.acceso = 'ANYONE';
+  t('y avisa si deja de ser privada', R.llamar({ token: TOKEN, accion: 'estado' }).fotos.privada === false);
+  t('el candado se libera siempre', R.locks.tomados === R.locks.liberados);
 }
 
 console.log(`\nResultado: ${ok} correctas, ${mal} con fallo`);

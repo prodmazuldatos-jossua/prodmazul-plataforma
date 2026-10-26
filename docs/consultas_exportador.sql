@@ -1,9 +1,9 @@
--- Prodmazul · Fase 5 · Parte 3 · Consultas del exportador (Supabase > SQL Editor)
+-- Prodmazul · Fase 5 · Partes 3 y 4 · Consultas del exportador (datos y fotos) (Supabase > SQL Editor)
 -- Copia y ejecuta UNA consulta a la vez. Solo las que dicen «MODIFICA» cambian algo; las demás solo leen.
 -- NUNCA ejecutes «select * from vault.decrypted_secrets»: mostraría los secretos en pantalla.
 
 -- 1) Las últimas ejecuciones del exportador (la más reciente arriba)
-select ejecucion_id, origen, estado, lotes, filas, quedan,
+select ejecucion_id, origen, estado, lotes, filas, quedan, fotos, fotos_error, quedan_fotos,
        to_char(pedida_en at time zone 'America/Guayaquil', 'DD/MM HH24:MI:SS') as pedida_ecuador,
        round(extract(epoch from (terminada_en - iniciada_en))::numeric, 1) as segundos,
        error
@@ -73,3 +73,44 @@ from core.sync_cola where estado = 'error' order by cola_id;
 
 -- 17) MODIFICA: cambiar el tamaño del lote (ejemplo: 100 filas en vez de 200, si Google se demora)
 -- update core.config set valor = '100'::jsonb where clave = 'sync_tamano_lote';
+
+-- ================================================================ PARTE 4 · RESPALDO DE FOTOS EN DRIVE
+-- 18) Resumen de fotos: respaldadas, pendientes, con error y agotadas
+select count(*) filter (where drive_file_id is not null)                                        as respaldadas,
+       count(*) filter (where confirmada and drive_file_id is null and purgada_supabase_en is null) as sin_respaldo,
+       count(*) filter (where not confirmada)                                                    as sin_confirmar,
+       count(*)                                                                                  as total
+from m01_recepcion.fotos_meta;
+
+-- 19) Fotos con problemas (con su mensaje y cuándo se reintentan). «AGOTADA» = se alcanzó el máximo de intentos.
+select s.foto_id, s.intentos, s.ultimo_error, s.proximo_intento_en,
+       case when s.intentos >= (select (valor #>> '{}')::int from core.config where clave = 'sync_max_intentos') then 'AGOTADA' else 'se reintentará' end as situacion
+from core.sync_fotos s order by s.actualizado_en desc;
+
+-- 20) Fotos respaldadas por mes (compara con la prueba «contar_fotos» del paso de comparación de la guía).
+--     «recepciones» cuenta las recepciones que tienen al menos una foto respaldada ese mes.
+select to_char(r.fecha_llegada, 'YYYY-MM') as mes,
+       count(distinct f.recepcion_id) as recepciones,
+       count(*) as fotos_respaldadas
+from m01_recepcion.fotos_meta f join m01_recepcion.recepciones r using (recepcion_id)
+where f.drive_file_id is not null
+group by 1 order by 1 desc;
+
+-- 21) Las últimas 20 fotos respaldadas (para abrir una en Drive y comprobarla)
+select f.foto_id, f.recepcion_id, f.nn, f.tamano_bytes, f.drive_file_id,
+       to_char(f.respaldo_drive_en at time zone 'America/Guayaquil', 'DD/MM HH24:MI:SS') as respaldada_ecuador
+from m01_recepcion.fotos_meta f where f.drive_file_id is not null order by f.respaldo_drive_en desc limit 20;
+
+-- 22) Espacio que ocupan las fotos de Supabase (en MB). Úsalo para estimar el espacio que necesitas en Drive.
+select count(*) as fotos, round(sum(tamano_bytes) / 1048576.0, 1) as megabytes_en_supabase
+from m01_recepcion.fotos_meta where purgada_supabase_en is null;
+
+-- 23) MODIFICA: dejar las fotos con error listas para reintentar ya (sin esperar los minutos de espera)
+-- update core.sync_fotos set proximo_intento_en = null where intentos < 5;
+
+-- 24) MODIFICA: devolver a la cola las fotos «agotadas» y con error (después de corregir la causa)
+-- update core.sync_fotos set intentos = 0, proximo_intento_en = null, reservado_hasta = null;
+
+-- 25) MODIFICA: repetir el respaldo de UNA foto (por ejemplo, si la borraron de Drive por error). Cambia el identificador.
+--     Si el archivo sigue en Drive, el receptor lo reutiliza y no crea otro.
+-- select core.sync_fotos_olvidar('FOT-M01-...-...-01');

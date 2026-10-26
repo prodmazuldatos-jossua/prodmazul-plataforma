@@ -1,5 +1,5 @@
 /**
- * Prodmazul · Receptor de Google (Apps Script) · versión 2.0 · Fase 5 · Parte 2
+ * Prodmazul · Receptor de Google (Apps Script) · versión 2.1 · Fase 5 · Partes 2 y 4
  *
  * Qué hace:
  *   - Recibe lotes de cambios desde Supabase y los escribe en el libro del año «Prodmazul_Respaldo_AAAA»
@@ -7,19 +7,21 @@
  *   - Actualiza o inserta por clave: reenviar el mismo lote NO duplica filas.
  *   - Borra las filas que Supabase indica como «borrar».
  *   - Crea el libro del año si no existe y protege cada pestaña contra edición manual (aviso).
+ *   - (Parte 4) Guarda las fotos en Drive: baja cada foto desde una dirección temporal de Supabase y la deja en
+ *     Prodmazul_Respaldo_Fotos/M01_Recepcion/AAAA/MM/REC-.../foto_NN.jpg (carpeta privada; no duplica si se reenvía).
  *   - Solo responde si recibe el TOKEN correcto (propiedad de la secuencia de comandos; nunca va en el código).
  *
  * Propiedades de la secuencia de comandos (Configuración del proyecto):
  *   TOKEN      token secreto de 40 caracteres            (ya existe)
  *   SHEET_ID   ID del libro «Prodmazul_Respaldo_2026»    (ya existe)
- *   FOLDER_ID  ID de la carpeta de fotos                 (ya existe; se usa en la Parte 4)
+ *   FOLDER_ID  ID de la carpeta de fotos                 (ya existe; la Parte 4 guarda aquí las fotos)
  *   LIBRO_AAAA ID de cada libro del año                  (las crea el propio script)
  *
  * Requiere el servicio avanzado «Google Sheets API» (Servicios > Agregar un servicio > Google Sheets API),
  * identificador «Sheets». Se usa para escribir los valores tal cual (RAW): un texto como «001» o «=1+1»
  * NO se convierte en número ni en fórmula.
  */
-const VERSION = '2.0';
+const VERSION = '2.1';
 const PROPS = PropertiesService.getScriptProperties();
 const ZONA = 'America/Guayaquil';
 const MAX_FILAS_LOTE = 2000;     // filas (cambios + borrados) por lote
@@ -68,6 +70,12 @@ function doPost(e) {
       case 'estado':
         return salida(estado());
 
+      case 'guardar_fotos':
+        return salida(guardarFotos(body));
+
+      case 'contar_fotos':
+        return salida(contarFotos(body));
+
       // Pruebas de la Fase 3 (se conservan)
       case 'prueba_hoja': {
         const hoja = SpreadsheetApp.openById(PROPS.getProperty('SHEET_ID')).getSheetByName('_conexion');
@@ -96,6 +104,8 @@ function autorizar() {
   const ss = SpreadsheetApp.openById(PROPS.getProperty('SHEET_ID'));
   Sheets.Spreadsheets.Values.get(ss.getId(), "'" + ss.getSheets()[0].getName() + "'!A1");
   DriveApp.getFilesByName('Prodmazul_Respaldo_' + anioActual()).hasNext();
+  DriveApp.getFolderById(PROPS.getProperty('FOLDER_ID')).getName();
+  UrlFetchApp.fetch('https://www.google.com/generate_204', { muteHttpExceptions: true });  // pide el permiso de conexión externa (fotos)
   Session.getEffectiveUser().getEmail();  // pide el permiso de correo, que usa la busqueda de libros por nombre
   return 'Permisos correctos: ' + ss.getName();
 }
@@ -392,6 +402,152 @@ function estado() {
     });
     libros.push({ anio: Number(k.slice(6)), nombre: ss.getName(), url: ss.getUrl(), disponible: true, hojas: hojas });
   });
+  let fotos = { configurada: false };
+  try {
+    const raiz = carpetaRaiz();
+    fotos = { configurada: true, carpeta: raiz.getName(), privada: raiz.getSharingAccess() === DriveApp.Access.PRIVATE };
+  } catch (err) { fotos = { configurada: false, error: String(err && err.message ? err.message : err) }; }
   return { ok: true, version: VERSION, hora: new Date().toISOString(), ultimo_lote: PROPS.getProperty('ULTIMO_LOTE') || null,
-           ultima_sync: PROPS.getProperty('ULTIMA_SYNC') || null, libros: libros };
+           ultima_sync: PROPS.getProperty('ULTIMA_SYNC') || null, libros: libros, fotos: fotos };
+}
+
+// ------------------------------------------------------------------ fotos (Fase 5 · Parte 4)
+const MAX_FOTOS_LLAMADA = 10;
+const LIMITE_FOTOS_MS = 80000;          // dentro de una llamada; el resto queda para la próxima
+const MAX_BYTES_FOTO = 6 * 1024 * 1024;  // Supabase admite 5 MB por foto
+const EXT_FOTO = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const RE_FOTO_ID = /^FOT-M01-[A-Za-z0-9-]{3,60}-\d{2}$/;
+const RE_REC = /^REC-(\d{4})(\d{2})\d{2}-\d{4}$/;
+// Solo se baja de una dirección temporal del almacenamiento de Supabase, del bucket de fotos de Recepción.
+const RE_URL_FOTO = /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/sign\/m01-recepcion-fotos\/[^\s?#]+\?token=[A-Za-z0-9._-]+(&[A-Za-z0-9=_.%-]*)?$/;
+
+function carpetaRaiz() {
+  const id = PROPS.getProperty('FOLDER_ID');
+  if (!id) throw new ErrorSolicitud('Falta la propiedad FOLDER_ID (carpeta de fotos) en el script.');
+  let c;
+  try { c = DriveApp.getFolderById(id); } catch (err) { throw new ErrorSolicitud('No se encontró la carpeta de fotos (FOLDER_ID).'); }
+  if (c.isTrashed()) throw new ErrorSolicitud('La carpeta de fotos está en la papelera.');
+  return c;
+}
+
+function subcarpeta(padre, nombre, crear) {
+  const it = padre.getFoldersByName(nombre);
+  while (it.hasNext()) { const c = it.next(); if (!c.isTrashed()) return c; }
+  return crear ? padre.createFolder(nombre) : null;
+}
+
+function validarFoto(f) {
+  if (!f || typeof f !== 'object') throw new ErrorSolicitud('Foto no valida');
+  if (typeof f.foto_id !== 'string' || !RE_FOTO_ID.test(f.foto_id)) throw new ErrorSolicitud('foto_id no valido');
+  const m = typeof f.recepcion_id === 'string' ? RE_REC.exec(f.recepcion_id) : null;
+  if (!m) throw new ErrorSolicitud('recepcion_id no valido en ' + f.foto_id);
+  const anio = Number(m[1]), mes = Number(m[2]);
+  if (anio < 2020 || anio > anioActual() + 1 || mes < 1 || mes > 12) throw new ErrorSolicitud('Fecha fuera de rango en ' + f.foto_id);
+  if (f.foto_id.indexOf(f.recepcion_id) < 0) throw new ErrorSolicitud('foto_id y recepcion_id no coinciden en ' + f.foto_id);
+  if (typeof f.nn !== 'number' || f.nn % 1 !== 0 || f.nn < 1 || f.nn > 5) throw new ErrorSolicitud('nn no valido en ' + f.foto_id);
+  if (f.foto_id.slice(-2) !== (f.nn < 10 ? '0' : '') + f.nn) throw new ErrorSolicitud('nn no coincide con foto_id en ' + f.foto_id);
+  if (!Object.prototype.hasOwnProperty.call(EXT_FOTO, f.tipo_mime)) throw new ErrorSolicitud('Tipo de imagen no permitido en ' + f.foto_id);
+  if (typeof f.ruta !== 'string' || f.ruta.length < 5 || f.ruta.length > 300) throw new ErrorSolicitud('ruta no valida en ' + f.foto_id);
+  if (typeof f.url !== 'string' || f.url.length > 2000 || !RE_URL_FOTO.test(f.url)) throw new ErrorSolicitud('Direccion de descarga no permitida en ' + f.foto_id);
+  if (f.bytes_esperados !== undefined && f.bytes_esperados !== null &&
+      (typeof f.bytes_esperados !== 'number' || f.bytes_esperados < 1 || f.bytes_esperados > MAX_BYTES_FOTO)) throw new ErrorSolicitud('bytes_esperados no valido en ' + f.foto_id);
+  return { foto_id: f.foto_id, recepcion_id: f.recepcion_id, anio: m[1], mes: m[2], nn: f.nn, tipo_mime: f.tipo_mime,
+           ruta: f.ruta, url: f.url, bytes_esperados: f.bytes_esperados || null };
+}
+
+function coincideFormato(bytes, mime) {
+  const b = function (i) { return bytes[i] & 255; };
+  if (mime === 'image/jpeg') return bytes.length > 3 && b(0) === 0xFF && b(1) === 0xD8 && b(2) === 0xFF;
+  if (mime === 'image/png') return bytes.length > 8 && b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4E && b(3) === 0x47;
+  if (mime === 'image/webp') return bytes.length > 12 && b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46 && b(8) === 0x57 && b(9) === 0x45 && b(10) === 0x42 && b(11) === 0x50;
+  return false;
+}
+
+function hex(bytes) {
+  return bytes.map(function (x) { const h = (x & 255).toString(16); return h.length < 2 ? '0' + h : h; }).join('');
+}
+
+function respaldarFoto(raiz, f) {
+  const carpeta = subcarpeta(subcarpeta(subcarpeta(subcarpeta(raiz, 'M01_Recepcion', true), f.anio, true), f.mes, true), f.recepcion_id, true);
+
+  // ¿Ya está? Cada archivo guarda en su descripción la ruta única de la foto en Supabase: reenviar no duplica.
+  const it = carpeta.getFiles();
+  while (it.hasNext()) {
+    const a = it.next();
+    if (!a.isTrashed() && a.getDescription() === f.ruta) {
+      return { foto_id: f.foto_id, ok: true, drive_file_id: a.getId(), bytes: a.getSize(), reutilizada: true };
+    }
+  }
+
+  const resp = UrlFetchApp.fetch(f.url, { muteHttpExceptions: true, followRedirects: false });
+  const codigo = resp.getResponseCode();
+  if (codigo !== 200) return { foto_id: f.foto_id, ok: false, error: 'Supabase respondio ' + codigo + ' al descargar la foto' };
+  const bytes = resp.getContent();
+  const n = bytes.length;
+  if (n === 0 || n > MAX_BYTES_FOTO) return { foto_id: f.foto_id, ok: false, error: 'La foto descargada tiene un tamano no valido (' + n + ' bytes)' };
+  if (!coincideFormato(bytes, f.tipo_mime)) return { foto_id: f.foto_id, ok: false, error: 'El archivo descargado no es una imagen ' + f.tipo_mime };
+  if (f.bytes_esperados && n !== f.bytes_esperados) {
+    return { foto_id: f.foto_id, ok: false, error: 'Tamano distinto: se descargaron ' + n + ' bytes y se esperaban ' + f.bytes_esperados };
+  }
+
+  const ext = EXT_FOTO[f.tipo_mime];
+  const nombre = 'foto_' + (f.nn < 10 ? '0' : '') + f.nn + '.' + ext;
+  // Si ya hay otro archivo con ese nombre (se reemplazó la foto por otra), se conserva con otro nombre.
+  const sello = Utilities.formatDate(new Date(), ZONA, "yyyy-MM-dd'T'HH:mm:ssXXX").replace(/\D/g, '').slice(0, 14);
+  const previos = carpeta.getFilesByName(nombre);
+  while (previos.hasNext()) {
+    const a = previos.next();
+    if (!a.isTrashed()) a.setName(a.getName().replace(/^(foto_\d{2})/, '$1_anterior_' + sello));
+  }
+
+  const archivo = carpeta.createFile(Utilities.newBlob(bytes, f.tipo_mime, nombre));
+  archivo.setDescription(f.ruta);
+  if (archivo.getSize() !== n) {
+    archivo.setTrashed(true);
+    return { foto_id: f.foto_id, ok: false, error: 'Drive guardo ' + archivo.getSize() + ' bytes y se esperaban ' + n };
+  }
+  return { foto_id: f.foto_id, ok: true, drive_file_id: archivo.getId(), bytes: n,
+           sha256: hex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes)), reutilizada: false };
+}
+
+function guardarFotos(body) {
+  const lista = body.fotos;
+  if (!Array.isArray(lista) || lista.length < 1 || lista.length > MAX_FOTOS_LLAMADA) throw new ErrorSolicitud('fotos no valido (de 1 a ' + MAX_FOTOS_LLAMADA + ')');
+  const plan = lista.map(validarFoto);   // se valida TODO antes de tocar Drive
+  const raiz = carpetaRaiz();
+  if (raiz.getSharingAccess() !== DriveApp.Access.PRIVATE) {
+    throw new ErrorSolicitud('La carpeta de fotos tiene un enlace compartido (acceso general). Cambia el acceso a «Restringido» y vuelve a intentar.');
+  }
+  const inicio = Date.now();
+  const resultados = plan.map(function (f) {
+    if (Date.now() - inicio > LIMITE_FOTOS_MS) return { foto_id: f.foto_id, ok: false, pendiente: true, error: 'No alcanzo el tiempo; se reintentara.' };
+    try { return respaldarFoto(raiz, f); }
+    catch (err) { return { foto_id: f.foto_id, ok: false, error: String(err && err.message ? err.message : err).slice(0, 300) }; }
+  });
+  return { ok: true, resultados: resultados, version: VERSION };
+}
+
+// Cuenta las fotos guardadas de un mes (para comparar con Supabase). Recorre M01_Recepcion/AAAA/MM.
+function contarFotos(body) {
+  const anio = Number(body.anio), mes = Number(body.mes);
+  if (!(anio >= 2020 && anio <= anioActual() + 1) || !(mes >= 1 && mes <= 12)) throw new ErrorSolicitud('anio o mes no validos');
+  const raiz = carpetaRaiz();
+  let dm = raiz;
+  ['M01_Recepcion', String(anio), mes < 10 ? '0' + mes : String(mes)].forEach(function (n) { dm = dm ? subcarpeta(dm, n, false) : null; });
+  if (!dm) return { ok: true, anio: anio, mes: mes, recepciones: 0, fotos: 0, completo: true, version: VERSION };
+  const inicio = Date.now();
+  let recepciones = 0, fotos = 0, completo = true;
+  const carpetas = dm.getFolders();
+  while (carpetas.hasNext()) {
+    if (Date.now() - inicio > LIMITE_FOTOS_MS) { completo = false; break; }
+    const c = carpetas.next();
+    if (c.isTrashed()) continue;
+    recepciones++;
+    const archivos = c.getFiles();
+    while (archivos.hasNext()) {
+      const a = archivos.next();
+      if (!a.isTrashed() && /^foto_\d{2}\.(jpg|png|webp)$/.test(a.getName())) fotos++;
+    }
+  }
+  return { ok: true, anio: anio, mes: mes, recepciones: recepciones, fotos: fotos, completo: completo, version: VERSION };
 }

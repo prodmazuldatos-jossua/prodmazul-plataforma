@@ -3,6 +3,7 @@
 // límites de la cuadrícula, «no se pueden borrar todas las filas no inmovilizadas» y escritura RAW.
 import vm from 'vm';
 import fs from 'fs';
+import crypto from 'crypto';
 
 export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail.com' } = {}) {
   let reloj = new Date(ahora).getTime();
@@ -117,6 +118,31 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
     }
   } };
 
+  // ---- Drive: carpetas y archivos (para las fotos)
+  R.carpetas = {};
+  const iter = (lista) => { let i = 0; return { hasNext: () => i < lista.length, next: () => lista[i++] }; };
+  class ArchivoDrive {
+    constructor(carpeta, nombre, mime, bytes) { this.id = nuevoId(); this.nombre = nombre; this.mime = mime; this.bytes = Buffer.from(bytes); this.desc = ''; this.papelera = false; this.carpeta = carpeta; }
+    getId() { return this.id; } getName() { return this.nombre; } setName(n) { this.nombre = n; return this; }
+    getDescription() { return this.desc; } setDescription(d) { this.desc = d; return this; }
+    getSize() { return this.bytes.length; } isTrashed() { return this.papelera; } setTrashed(b) { this.papelera = b; return this; }
+    getMimeType() { return this.mime; }
+  }
+  class CarpetaDrive {
+    constructor(nombre, padre) { this.id = nuevoId(); this.nombre = nombre; this.padre = padre; this.sub = []; this.arch = []; this.papelera = false; this.acceso = 'PRIVATE'; R.carpetas[this.id] = this; }
+    getId() { return this.id; } getName() { return this.nombre; } isTrashed() { return this.papelera; }
+    getFoldersByName(n) { return iter(this.sub.filter((c) => c.nombre === n)); }
+    getFolders() { return iter(this.sub.slice()); }
+    createFolder(n) { const c = new CarpetaDrive(n, this); this.sub.push(c); return c; }
+    getFiles() { return iter(this.arch.slice()); }
+    getFilesByName(n) { return iter(this.arch.filter((a) => a.nombre === n)); }
+    createFile(blob) { const a = new ArchivoDrive(this, blob.n, blob.m, blob.b); this.arch.push(a); return a; }
+    getSharingAccess() { return this.acceso; }
+  }
+  R.nuevaCarpeta = (nombre) => new CarpetaDrive(nombre, null);
+  R.red = () => ({ codigo: 404, bytes: [] });  // lo reemplaza cada prueba
+  R.descargas = [];
+
   const archivoDrive = (l) => ({
     getId: () => l.id, isTrashed: () => l.papelera, getMimeType: () => 'application/vnd.google-apps.spreadsheet',
     getOwner: () => (l.dueno ? { getEmail: () => l.dueno } : null)
@@ -134,13 +160,22 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
       formatDate(d, tz, f) { const e = new Date(d.getTime() - 5 * 3600e3); const p = (n) => String(n).padStart(2, '0');
         if (f === 'yyyy') return String(e.getUTCFullYear());
         return `${e.getUTCFullYear()}-${p(e.getUTCMonth() + 1)}-${p(e.getUTCDate())}T${p(e.getUTCHours())}:${p(e.getUTCMinutes())}:${p(e.getUTCSeconds())}-05:00`; },
-      base64Decode: (s) => Buffer.from(s, 'base64'), newBlob: (b, m, n) => ({ b, m, n })
+      base64Decode: (s) => Buffer.from(s, 'base64'), newBlob: (b, m, n) => ({ b, m, n }),
+      DigestAlgorithm: { SHA_256: 'SHA_256' },
+      computeDigest: (alg, bytes) => Array.from(crypto.createHash('sha256').update(Buffer.from(bytes)).digest(), (x) => (x > 127 ? x - 256 : x))
     },
+    UrlFetchApp: { fetch: (url, opc) => {
+      R.descargas.push({ url, opc });
+      const r = R.red(url);
+      return { getResponseCode: () => r.codigo, getContent: () => Array.from(Buffer.from(r.bytes), (x) => (x > 127 ? x - 256 : x)) };
+    } },
     SpreadsheetApp: {
       create: (n) => new Libro(n, yo),
       openById: (id) => { const l = R.archivos[id]; if (!l) throw new Error('No se encontró el libro'); return l; }
     },
     DriveApp: {
+      Access: { PRIVATE: 'PRIVATE', ANYONE: 'ANYONE', ANYONE_WITH_LINK: 'ANYONE_WITH_LINK', DOMAIN: 'DOMAIN', DOMAIN_WITH_LINK: 'DOMAIN_WITH_LINK' },
+      getFolderById: (id) => { const c = R.carpetas[id]; if (!c) throw new Error('No item with the given ID could be found'); return c; },
       getFileById: (id) => { const l = R.archivos[id]; if (!l) throw new Error('No item with the given ID could be found'); return archivoDrive(l); },
       getFilesByName: (n) => { const l = Object.values(R.archivos).filter((x) => x.nombre === n); let i = 0; return { hasNext: () => i < l.length, next: () => archivoDrive(l[i++]) }; }
     },
