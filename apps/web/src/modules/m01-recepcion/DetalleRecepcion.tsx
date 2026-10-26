@@ -184,7 +184,7 @@ export default function DetalleRecepcion() {
         <h2 id="d2">Gavetas pesadas</h2>
         {r.gavetas.length === 0 ? <p className="texto-suave">Sin gavetas pesadas.</p> : (
           <>
-            <div className="tabla-scroll tabla-scroll-chica">
+            <div className="tabla-scroll tabla-scroll-chica" tabIndex={0} role="region" aria-label="Pesos de las gavetas">
               <table className="tabla-lista">
                 <thead><tr><th>Gaveta</th><th className="num">Peso</th></tr></thead>
                 <tbody>{r.gavetas.map((g) => <tr key={g.num_gaveta}><td>{g.num_gaveta}</td><td className="num">{peso(Number(g.peso_lb))}</td></tr>)}</tbody>
@@ -208,7 +208,7 @@ export default function DetalleRecepcion() {
         <h2 id="d4">Almacenamiento de materia prima</h2>
         {r.almacenamiento.length === 0 ? <p className="texto-suave">Sin filas de almacenamiento.</p> : (
           <>
-            <div className="tabla-scroll">
+            <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Almacenamiento de materia prima">
               <table className="tabla-lista">
                 <thead><tr><th>Bin</th><th>Sellos recepción</th><th>Sellos almacenamiento</th><th className="num">Temp. °C</th><th className="num">Libras aprox.</th></tr></thead>
                 <tbody>{r.almacenamiento.map((a) => (

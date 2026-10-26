@@ -117,7 +117,7 @@ export default function ListadoRecepciones() {
           <p className="texto-suave" data-testid="total-lista" aria-live="polite">
             {datos.total} {datos.total === 1 ? 'recepción' : 'recepciones'}
           </p>
-          <div className="tabla-scroll">
+          <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Listado de recepciones">
             <table className="tabla-lista">
               <thead>
                 <tr>

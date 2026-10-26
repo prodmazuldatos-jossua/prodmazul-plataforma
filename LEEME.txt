@@ -1,7 +1,9 @@
-Fase 4 - Parte 11: PDF de la recepción
-Archivos nuevos:   apps/web/src/modules/m01-recepcion/pdf.ts, pdf.test.ts, pdfDescarga.ts
-Archivo cambiado:  apps/web/src/modules/m01-recepcion/DetalleRecepcion.tsx (botón «PDF»)
-NO incluye package.json: instala la librería con
-    cd apps/web
-    npm install pdf-lib@1.17.1 --save-exact
-No hay cambios en Supabase (no hay migración nueva).
+Fase 4 - Parte 12: Cierre de la fase (aceptación, accesibilidad, seguridad, restauración y manuales)
+Reemplaza:   respaldo-diario.ps1 (ahora incluye las RECEPCIONES), apps/web/src/modules/m01-recepcion/DetalleRecepcion.tsx y ListadoRecepciones.tsx (accesibilidad)
+Nuevos:      restaurar-copia-local.ps1
+             docs/revision_seguridad_parte12.sql, docs/revision_acceso_anonimo_parte12.ps1, docs/reabrir_lote.sql
+             docs/restaurar_preparar_local.sql, docs/restaurar_verificar.sql
+             docs/manuales/Manual_Usuario.html, docs/manuales/Manual_Administrador.html, docs/Informe_Cierre_Fase4.html
+No hay migración nueva ni cambios en package.json.
+No incluye contraseñas, claves ni tokens: los scripts las piden al ejecutarse.
+Todo se explica paso a paso en la guía: Fase4_Parte12_Guia.html
