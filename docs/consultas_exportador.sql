@@ -167,3 +167,20 @@ from m01_recepcion.fotos_meta;
 --     Nunca lo uses con fotos reales.
 -- update m01_recepcion.fotos_meta set subido_en = now() - interval '70 days', respaldo_drive_en = now() - interval '2 days'
 --  where foto_id = 'FOT-M01-...-...-01' and drive_file_id is not null;
+
+-- 37) Estado del respaldo en cifras (lo mismo que ve la aplicación en «Estado del respaldo»)
+select (select valor from core.config where clave = 'sync_activa') as respaldo_encendido,
+       (select valor from core.config where clave = 'sync_alerta_horas') as limite_horas_aviso,
+       e.ultima_sync_ok_en,
+       round(extract(epoch from (now() - e.ultima_sync_ok_en)) / 60) as minutos_sin_sincronizar,
+       (select count(*) from core.sync_cola where estado in ('pendiente','enviando')) as cambios_por_enviar,
+       (select count(*) from core.sync_cola where estado = 'error') as envios_con_error,
+       (select count(*) from m01_recepcion.fotos_meta where confirmada and drive_file_id is null and purgada_supabase_en is null) as fotos_sin_respaldo
+from core.sync_estado e where e.id = 1;
+
+-- 38) MODIFICA SOLO PARA PRUEBAS: simular que hace 7 horas que no se sincroniza (la aplicación mostrará el aviso en rojo
+--     a quienes administran en menos de un minuto). Para quitarlo: ejecuta la consulta 39 y espera a que termine la sincronización.
+-- update core.sync_estado set ultima_sync_ok_en = now() - interval '7 hours' where id = 1;
+
+-- 39) MODIFICA: pedir una sincronización ahora; al terminar bien, el reloj vuelve a cero y el aviso rojo desaparece
+-- select core.sync_disparar('manual');

@@ -6,6 +6,8 @@ import { useOnline } from '../lib/conexion';
 import { Alerta, Cargando } from './ui';
 import { Icono, iconoDeModulo } from './iconos';
 import { Sincronizador, usarCola } from '../offline/usarCola';
+import { RespaldoProvider } from './respaldo/usarRespaldo';
+import { AvisoRespaldo, IndicadorRespaldo } from './respaldo/IndicadorRespaldo';
 
 function iniciales(texto: string): string {
   const partes = texto.replace(/@.*/, '').split(/[\s._-]+/).filter(Boolean);
@@ -13,7 +15,7 @@ function iniciales(texto: string): string {
 }
 
 export default function Layout() {
-  const { perfil, cerrarSesion } = useAuth();
+  const { perfil, cerrarSesion, puede } = useAuth();
   const { unidad, setUnidad } = useUnidad();
   const online = useOnline();
   const modulos = perfil?.modulos ?? [];
@@ -47,11 +49,14 @@ export default function Layout() {
   }, [menuAbierto]);
 
   const modulo = modulos.find((m) => pathname === m.ruta || pathname.startsWith(`${m.ruta}/`));
-  const titulo = pathname === '/' ? 'Inicio' : pathname.startsWith('/cuenta') ? 'Mi cuenta' : pathname.startsWith('/admin/usuarios') ? 'Usuarios' : modulo?.nombre ?? 'Prodmazul';
+  const titulo = pathname === '/' ? 'Inicio' : pathname.startsWith('/cuenta') ? 'Mi cuenta' : pathname.startsWith('/admin/usuarios') ? 'Usuarios' : pathname.startsWith('/admin/respaldo') ? 'Estado del respaldo' : modulo?.nombre ?? 'Prodmazul';
   const esAdmin = perfil?.es_admin_general === true;
   const nombre = perfil?.nombre?.trim() || perfil?.correo || '';
+  // Quienes administran (administrador general o permiso de configuración del módulo 1) ven el estado del respaldo.
+  const veRespaldo = esAdmin || puede('M01', 'admin_config');
 
   return (
+    <RespaldoProvider habilitado={veRespaldo}>
     <div className="app">
       <div className="principal">
         <header className="barra">
@@ -66,6 +71,7 @@ export default function Layout() {
                   {cola.sincronizando ? 'Enviando… ' : ''}{cola.total} {cola.total === 1 ? 'pendiente' : 'pendientes'}{cola.rechazadas > 0 ? ` (${cola.rechazadas} con problema)` : ''}
                 </Link>
               )}
+              {veRespaldo && <IndicadorRespaldo />}
             </div>
             <div className="interruptor" role="group" aria-label="Unidad de peso">
               <button className={unidad === 'lb' ? 'activo' : ''} onClick={() => setUnidad('lb')} aria-pressed={unidad === 'lb'}>Lb</button>
@@ -88,6 +94,7 @@ export default function Layout() {
           <nav aria-label="Principal">
             <NavLink to="/" end><Icono nombre="inicio" tamano={22} />Inicio</NavLink>
             {modulos.map((m) => <NavLink key={m.modulo_id} to={m.ruta}><Icono nombre={iconoDeModulo(m.modulo_id)} tamano={22} />{m.nombre}</NavLink>)}
+            {veRespaldo && <NavLink to="/admin/respaldo"><Icono nombre="nube" tamano={22} />Estado del respaldo</NavLink>}
             {esAdmin && <NavLink to="/admin/usuarios"><Icono nombre="usuarios" tamano={22} />Usuarios</NavLink>}
             {esAdmin && <NavLink to="/cuenta/clave"><Icono nombre="candado" tamano={22} />Cambiar mi contraseña</NavLink>}
           </nav>
@@ -97,6 +104,7 @@ export default function Layout() {
         </aside>
 
         <Sincronizador />
+        {veRespaldo && <AvisoRespaldo />}
         {!online && <Alerta tipo="aviso">Sin conexión. Puedes registrar recepciones nuevas: se guardan en este dispositivo y se envían solas cuando vuelva la señal. Editar, anular, eliminar y ver fotos necesitan señal.</Alerta>}
         {verAviso && cola.ultimo && (
           <Alerta tipo={cola.ultimo.rechazadas > 0 ? 'aviso' : 'exito'}>
@@ -110,5 +118,6 @@ export default function Layout() {
         </main>
       </div>
     </div>
+    </RespaldoProvider>
   );
 }
