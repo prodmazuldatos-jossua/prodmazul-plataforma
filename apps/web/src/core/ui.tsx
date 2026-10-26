@@ -1,11 +1,25 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { Icono, type NombreIcono } from './iconos';
+
+const ICONO_ALERTA: Record<string, NombreIcono> = { info: 'info', exito: 'ok', aviso: 'alerta', error: 'error' };
 
 export function Alerta({ tipo = 'info', children }: { tipo?: 'info' | 'exito' | 'aviso' | 'error'; children: ReactNode }) {
-  return <div className={`alerta alerta-${tipo}`} role={tipo === 'error' ? 'alert' : 'status'}>{children}</div>;
+  return (
+    <div className={`alerta alerta-${tipo}`} role={tipo === 'error' ? 'alert' : 'status'}>
+      <Icono nombre={ICONO_ALERTA[tipo]} tamano={22} />
+      <div className="alerta-cuerpo">{children}</div>
+    </div>
+  );
 }
 
+/** Indicador de carga: giro + texto, y barras de esqueleto que dan la sensación de que la pantalla ya está lista. */
 export function Cargando({ texto = 'Cargando…' }: { texto?: string }) {
-  return <div className="cargando" role="status"><span className="giro" aria-hidden="true" />{texto}</div>;
+  return (
+    <>
+      <div className="cargando" role="status"><span className="giro" aria-hidden="true" />{texto}</div>
+      <div className="esqueleto" aria-hidden="true"><span /><span /><span /></div>
+    </>
+  );
 }
 
 export function Vacio({ titulo, children }: { titulo: string; children?: ReactNode }) {

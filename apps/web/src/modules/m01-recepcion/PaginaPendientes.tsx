@@ -7,6 +7,7 @@ import { formatoFecha, formatoFechaHora } from '../../lib/fechas';
 import { cola } from '../../offline/pendientes';
 import { usarCola } from '../../offline/usarCola';
 import type { Pendiente } from '../../offline/db';
+import { Icono } from '../../core/iconos';
 
 /** Recepciones guardadas en este dispositivo que todavía no llegaron al servidor. */
 export default function PaginaPendientes() {
@@ -35,8 +36,8 @@ export default function PaginaPendientes() {
   if (lista === null) return <Cargando texto="Leyendo lo guardado en este dispositivo…" />;
   return (
     <>
-      <p><Link to="/m01">← Recepciones</Link></p>
-      <h1>Pendientes de envío</h1>
+      <p className="migas"><Link to="/m01"><Icono nombre="izquierda" tamano={18} />Recepciones</Link></p>
+      <h1><Icono nombre="reloj" tamano={28} />Pendientes de envío</h1>
       <p className="texto-suave">
         Recepciones registradas en este dispositivo que todavía no están en el servidor. Se envían solas al volver la señal
         (y cada minuto mientras haya conexión).
@@ -47,7 +48,7 @@ export default function PaginaPendientes() {
 
       <div className="acciones-fila">
         <button type="button" className="boton-primario" disabled={!online || estado.sincronizando || estado.enEspera === 0} onClick={() => void estado.sincronizarAhora()}>
-          {estado.sincronizando ? 'Enviando…' : 'Enviar ahora'}
+          <Icono nombre="enviar" />{estado.sincronizando ? 'Enviando…' : 'Enviar ahora'}
         </button>
         {!online && <span className="texto-suave">Sin conexión: se enviarán al volver la señal.</span>}
       </div>

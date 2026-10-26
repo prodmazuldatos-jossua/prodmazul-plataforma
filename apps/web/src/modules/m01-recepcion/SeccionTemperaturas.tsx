@@ -2,6 +2,7 @@ import { TemperaturaInput } from './controles';
 import { gavetasConPeso } from './esquema';
 import { useUnidad } from '../../lib/unidades';
 import { MAX_LECTURAS, lecturaVacia, type Errores, type LecturaForm } from './tipos';
+import { Icono } from '../../core/iconos';
 
 interface Props {
   lecturas: LecturaForm[];
@@ -19,7 +20,7 @@ export default function SeccionTemperaturas({ lecturas, gavetas, errores, onCamb
 
   return (
     <section className="tarjeta tarjeta-ancha" id="seccion-temperaturas" aria-labelledby="sec3" data-testid="seccion-temperaturas">
-      <h2 id="sec3">3. Temperaturas del producto (°C)</h2>
+      <h2 id="sec3" className="titulo-seccion"><Icono nombre="termometro" />3. Temperaturas del producto (°C)</h2>
       <p className="texto-suave">
         Temperatura de referencia de algunas gavetas. Elige la gaveta y escribe la temperatura; usa <strong>±</strong> para temperaturas bajo cero.
         Si necesitas más gavetas, presiona <strong>+ Agregar gaveta</strong>.

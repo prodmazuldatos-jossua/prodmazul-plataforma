@@ -14,6 +14,7 @@ import GaleriaFotos from './GaleriaFotos';
 import InsigniaEstado from './InsigniaEstado';
 import { capacidades } from './mapeo';
 import type { RecepcionDetalle } from './tipos';
+import { Icono } from '../../core/iconos';
 
 type Accion = 'anular' | 'eliminar' | 'reactivar';
 const MOTIVO_MIN = 5;
@@ -128,19 +129,19 @@ export default function DetalleRecepcion() {
     <>
       <div className="encabezado-lista">
         <div>
-          <p className="migas"><Link to="/m01">← Recepciones</Link></p>
+          <p className="migas"><Link to="/m01"><Icono nombre="izquierda" tamano={18} />Recepciones</Link></p>
           <h1>Recepción {r.recepcion_id} <InsigniaEstado estado={r.estado} /></h1>
         </div>
         <div className="acciones-fila acciones-detalle">
           <button type="button" className="boton-secundario" data-testid="boton-pdf" disabled={generandoPdf} onClick={generarPdf}>
-            {generandoPdf ? 'Generando PDF…' : 'PDF'}
+            <Icono nombre="pdf" />{generandoPdf ? 'Generando PDF…' : 'PDF'}
           </button>
           {cap.editar && (online
-            ? <Link className="boton-primario enlace-boton" to={`/m01/${r.recepcion_id}/editar`}>Editar</Link>
-            : <button type="button" className="boton-primario" disabled>Editar</button>)}
-          {cap.anular && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('anular')}>Anular</button>}
-          {cap.reactivar && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('reactivar')}>Reactivar</button>}
-          {cap.eliminar && <button type="button" className="boton-peligro" disabled={!online} onClick={() => setAccion('eliminar')}>Eliminar</button>}
+            ? <Link className="boton-primario enlace-boton" to={`/m01/${r.recepcion_id}/editar`}><Icono nombre="editar" />Editar</Link>
+            : <button type="button" className="boton-primario" disabled><Icono nombre="editar" />Editar</button>)}
+          {cap.anular && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('anular')}><Icono nombre="anular" />Anular</button>}
+          {cap.reactivar && <button type="button" className="boton-secundario" disabled={!online} onClick={() => setAccion('reactivar')}><Icono nombre="reactivar" />Reactivar</button>}
+          {cap.eliminar && <button type="button" className="boton-peligro" disabled={!online} onClick={() => setAccion('eliminar')}><Icono nombre="papelera" />Eliminar</button>}
         </div>
       </div>
       {!online && (cap.editar || cap.anular || cap.reactivar || cap.eliminar) && (
@@ -158,7 +159,7 @@ export default function DetalleRecepcion() {
       {r.estado === 'borrador' && <Alerta tipo="info">Es un borrador: puede completarse y cerrarse más tarde.</Alerta>}
 
       <section className="tarjeta tarjeta-ancha" aria-labelledby="d1">
-        <h2 id="d1">Datos generales</h2>
+        <h2 id="d1" className="titulo-seccion"><Icono nombre="nota" />Datos generales</h2>
         <dl className="datos">
           <Dato etiqueta="Fecha de llegada" id="d-fecha">{formatoFecha(r.fecha_llegada)}</Dato>
           <Dato etiqueta="Placa del vehículo">{r.placa_vehiculo ?? ''}</Dato>
@@ -181,7 +182,7 @@ export default function DetalleRecepcion() {
       </section>
 
       <section className="tarjeta tarjeta-ancha" aria-labelledby="d2">
-        <h2 id="d2">Gavetas pesadas</h2>
+        <h2 id="d2" className="titulo-seccion"><Icono nombre="balanza" />Gavetas pesadas</h2>
         {r.gavetas.length === 0 ? <p className="texto-suave">Sin gavetas pesadas.</p> : (
           <>
             <div className="tabla-scroll tabla-scroll-chica" tabIndex={0} role="region" aria-label="Pesos de las gavetas">
@@ -196,7 +197,7 @@ export default function DetalleRecepcion() {
       </section>
 
       <section className="tarjeta tarjeta-ancha" aria-labelledby="d3">
-        <h2 id="d3">Temperaturas del producto (°C)</h2>
+        <h2 id="d3" className="titulo-seccion"><Icono nombre="termometro" />Temperaturas del producto (°C)</h2>
         {r.temperaturas.length === 0 ? <p className="texto-suave">Sin temperaturas registradas.</p> : (
           <ul className="lista-simple">
             {r.temperaturas.map((t) => <li key={t.lectura_id}>{t.num_gaveta ? `Gaveta ${t.num_gaveta}` : `Lectura ${t.lectura_id}`}: <strong>{Number(t.temperatura_c).toFixed(1)} °C</strong></li>)}
@@ -205,7 +206,7 @@ export default function DetalleRecepcion() {
       </section>
 
       <section className="tarjeta tarjeta-ancha" aria-labelledby="d4">
-        <h2 id="d4">Almacenamiento de materia prima</h2>
+        <h2 id="d4" className="titulo-seccion"><Icono nombre="caja" />Almacenamiento de materia prima</h2>
         {r.almacenamiento.length === 0 ? <p className="texto-suave">Sin filas de almacenamiento.</p> : (
           <>
             <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Almacenamiento de materia prima">
@@ -224,12 +225,12 @@ export default function DetalleRecepcion() {
       </section>
 
       <section className="tarjeta tarjeta-ancha" aria-labelledby="d5">
-        <h2 id="d5">Observación</h2>
+        <h2 id="d5" className="titulo-seccion"><Icono nombre="editar" />Observación</h2>
         <p data-testid="d-observacion">{r.observacion ?? <span className="texto-suave">Sin observación.</span>}</p>
       </section>
 
       <section className="tarjeta tarjeta-ancha" aria-labelledby="d6">
-        <h2 id="d6">Fotos</h2>
+        <h2 id="d6" className="titulo-seccion"><Icono nombre="foto" />Fotos</h2>
         <GaleriaFotos recepcionId={r.recepcion_id} puedeBorrar={cap.editar && puede('M01', 'cargar_imagenes')} refrescar={r.version} />
         {cap.editar && puede('M01', 'cargar_imagenes') && <p className="ayuda">Para agregar fotos usa <strong>Editar</strong>.</p>}
       </section>

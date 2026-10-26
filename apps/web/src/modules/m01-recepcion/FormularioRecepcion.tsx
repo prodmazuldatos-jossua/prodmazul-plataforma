@@ -23,6 +23,7 @@ import { useOnline } from '../../lib/conexion';
 import { recepcionAForm } from './mapeo';
 import { aPayload, erroresPorSeccion, validarRecepcion } from './esquema';
 import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type FotoNueva, type InfoLote, type RecepcionDetalle, type RespuestaGuardar } from './tipos';
+import { Icono } from '../../core/iconos';
 
 const ORDEN_CAMPOS: CampoForm[] = [
   'fecha_llegada', 'placa_vehiculo', 'lote_id', 'proveedor', 'especie', 'piscina', 'guia_remision', 'num_gavetas_bines',
@@ -345,7 +346,7 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
       {errores.general && <Alerta tipo="aviso">{errores.general}</Alerta>}
 
       <section className="tarjeta tarjeta-ancha" id="seccion-datos" aria-labelledby="sec1">
-        <h2 id="sec1">1. Datos generales</h2>
+        <h2 id="sec1" className="titulo-seccion"><Icono nombre="nota" />1. Datos generales</h2>
         <div className="rejilla-form">
           <CampoTexto id="fecha_llegada" etiqueta="Fecha de llegada" tipo="date" obligatorio value={f.fecha_llegada}
                       onChange={(v) => cambiar('fecha_llegada', v)} error={errores.fecha_llegada} />
@@ -393,7 +394,7 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
       <SeccionAlmacenamiento filas={f.almacenamiento} errores={errores} onCambiar={cambiarAlmacenamiento} />
 
       <section className="tarjeta tarjeta-ancha" id="seccion-cierre" aria-labelledby="sec5">
-        <h2 id="sec5">5. Cierre</h2>
+        <h2 id="sec5" className="titulo-seccion"><Icono nombre="ok" />5. Cierre</h2>
         <div className="rejilla-form">
           <Campo id="observacion" etiqueta="Observación" error={errores.observacion}>
             <textarea id="observacion" rows={3} value={f.observacion} maxLength={2000}
@@ -432,14 +433,14 @@ export default function FormularioRecepcion({ inicial, onRecargar, pendiente }: 
         </div>
       ) : (
       <div className="barra-acciones">
-        <Link className="boton-secundario enlace-boton" to={editando ? `/m01/${inicial?.recepcion_id}` : '/m01'}>{editando ? 'Cancelar' : 'Salir'}</Link>
+        <Link className="boton-secundario enlace-boton" to={editando ? `/m01/${inicial?.recepcion_id}` : '/m01'}><Icono nombre="cerrar" tamano={18} />{editando ? 'Cancelar' : 'Salir'}</Link>
         {inicial?.estado !== 'cerrado' && (
           <button type="button" className="boton-secundario" disabled={guardando} onClick={() => void guardar('borrador')}>
-            {guardando ? 'Guardando…' : 'Guardar borrador'}
+            <Icono nombre="guardar" tamano={18} />{guardando ? 'Guardando…' : 'Guardar borrador'}
           </button>
         )}
         <button type="button" className="boton-primario" disabled={guardando} onClick={() => void guardar('cerrado')}>
-          {inicial?.estado === 'cerrado' ? (guardando ? 'Guardando…' : 'Guardar cambios') : 'Guardar y cerrar'}
+          <Icono nombre="ok" tamano={18} />{inicial?.estado === 'cerrado' ? (guardando ? 'Guardando…' : 'Guardar cambios') : 'Guardar y cerrar'}
         </button>
       </div>
       )}

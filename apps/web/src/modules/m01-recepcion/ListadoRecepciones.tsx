@@ -10,6 +10,7 @@ import { listarRecepciones } from './api';
 import InsigniaEstado from './InsigniaEstado';
 import { paginacion } from './mapeo';
 import type { FiltrosListado, RespuestaListado } from './tipos';
+import { Icono } from '../../core/iconos';
 
 const POR_PAGINA = 20;
 const ESTADOS_VALIDOS = ['activos', 'borrador', 'cerrado', 'anulado', 'todos', 'eliminado'];
@@ -65,8 +66,8 @@ export default function ListadoRecepciones() {
   return (
     <>
       <div className="encabezado-lista">
-        <h1>Recepciones</h1>
-        {puede('M01', 'crear') && <Link className="boton-primario enlace-boton" to="/m01/nueva">Nueva recepción</Link>}
+        <h1><Icono nombre="recepcion" tamano={28} />Recepciones</h1>
+        {puede('M01', 'crear') && <Link className="boton-primario enlace-boton" to="/m01/nueva"><Icono nombre="mas" />Nueva recepción</Link>}
       </div>
 
       <form className="filtros-lista" onSubmit={(e) => e.preventDefault()} aria-label="Filtros del listado">
@@ -95,7 +96,7 @@ export default function ListadoRecepciones() {
           <input id="f-hasta" type="date" value={filtros.hasta} min={filtros.desde || undefined} onChange={(e) => cambiar({ hasta: e.target.value })} />
         </div>
         {hayFiltros && (
-          <button type="button" className="boton-secundario" onClick={() => { setTexto(''); setParams({}, { replace: true }); }}>Quitar filtros</button>
+          <button type="button" className="boton-secundario" onClick={() => { setTexto(''); setParams({}, { replace: true }); }}><Icono nombre="cerrar" tamano={18} />Quitar filtros</button>
         )}
       </form>
 
@@ -146,10 +147,10 @@ export default function ListadoRecepciones() {
           {paginas > 1 && (
             <nav className="paginacion" aria-label="Páginas">
               <button type="button" className="boton-secundario" disabled={pagina <= 1}
-                      onClick={() => cambiar({ pag: String(pagina - 1) }, false)}>Anterior</button>
+                      onClick={() => cambiar({ pag: String(pagina - 1) }, false)}><Icono nombre="izquierda" tamano={18} />Anterior</button>
               <span data-testid="pagina-actual">Página {pagina} de {paginas}</span>
               <button type="button" className="boton-secundario" disabled={pagina >= paginas}
-                      onClick={() => cambiar({ pag: String(pagina + 1) }, false)}>Siguiente</button>
+                      onClick={() => cambiar({ pag: String(pagina + 1) }, false)}>Siguiente<Icono nombre="derecha" tamano={18} /></button>
             </nav>
           )}
         </>

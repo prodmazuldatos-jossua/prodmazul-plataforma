@@ -1,6 +1,7 @@
 import { PesoInput, useUnidad } from '../../lib/unidades';
 import { pesosPresentes, promedioBloque, totalPesos } from './calculos';
 import { NUM_GAVETAS_MAX, type Errores } from './tipos';
+import { Icono } from '../../core/iconos';
 
 interface Props {
   gavetas: (number | null)[];
@@ -16,7 +17,7 @@ export default function SeccionGavetas({ gavetas, errores, onCambiar }: Props) {
 
   return (
     <section className="tarjeta tarjeta-ancha" id="seccion-gavetas" aria-labelledby="sec2" data-testid="seccion-gavetas">
-      <h2 id="sec2">2. Gavetas</h2>
+      <h2 id="sec2" className="titulo-seccion"><Icono nombre="balanza" />2. Gavetas</h2>
       <p className="texto-suave">Escribe el peso de cada gaveta. Con <strong>Enter</strong> pasas a la siguiente. Las casillas que no uses se dejan vacías.</p>
       {errores.gavetas && <p className="error-campo" role="alert">{errores.gavetas}</p>}
       <div className="bloques-gavetas">

@@ -2,6 +2,7 @@ import { PesoInput, useUnidad } from '../../lib/unidades';
 import { TemperaturaInput } from './controles';
 import { totalLibrasAprox } from './calculos';
 import { MAX_FILAS_ALMACENAMIENTO, filaAlmacenamientoVacia, type AlmacenamientoForm, type Errores } from './tipos';
+import { Icono } from '../../core/iconos';
 
 interface Props {
   filas: AlmacenamientoForm[];
@@ -19,7 +20,7 @@ export default function SeccionAlmacenamiento({ filas, errores, onCambiar }: Pro
 
   return (
     <section className="tarjeta tarjeta-ancha" id="seccion-almacenamiento" aria-labelledby="sec4" data-testid="seccion-almacenamiento">
-      <h2 id="sec4">4. Almacenamiento de materia prima</h2>
+      <h2 id="sec4" className="titulo-seccion"><Icono nombre="caja" />4. Almacenamiento de materia prima</h2>
       <p className="texto-suave">Una fila por bin. Los números de bin y los sellos no se pueden repetir dentro de la misma recepción. Las filas vacías se ignoran.</p>
       <div className="filas-almacenamiento">
         {filas.map((f, i) => {

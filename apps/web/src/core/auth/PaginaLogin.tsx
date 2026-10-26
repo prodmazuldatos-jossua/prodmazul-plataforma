@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Alerta } from '../ui';
+import { Icono } from '../iconos';
 import { configuracionCompleta } from '../../lib/supabase';
 
 export default function PaginaLogin() {
@@ -24,6 +25,7 @@ export default function PaginaLogin() {
 
   return (
     <main className="pagina-acceso">
+      <div className="acceso-envoltura">
       <form className="tarjeta-acceso" onSubmit={enviar} noValidate>
         <img src="/logo.png" alt="Prodmazul S.A." className="logo-acceso" />
         <h1>Plataforma de Producción</h1>
@@ -39,20 +41,28 @@ export default function PaginaLogin() {
         {error && <Alerta tipo="error">{error}</Alerta>}
         <div className="campo">
           <label htmlFor="correo">Correo</label>
-          <input id="correo" type="email" autoComplete="username" required value={correo} onChange={(e) => setCorreo(e.target.value)} />
+          <div className="campo-icono">
+            <Icono nombre="correo" />
+            <input id="correo" type="email" autoComplete="username" required value={correo} onChange={(e) => setCorreo(e.target.value)} />
+          </div>
         </div>
         <div className="campo">
           <label htmlFor="clave">Contraseña</label>
           <div className="campo-con-boton">
-            <input id="clave" type={ver ? 'text' : 'password'} autoComplete="current-password" required value={clave} onChange={(e) => setClave(e.target.value)} />
-            <button type="button" className="boton-secundario" onClick={() => setVer(!ver)} aria-pressed={ver}>{ver ? 'Ocultar' : 'Ver'}</button>
+            <div className="campo-icono">
+              <Icono nombre="candado" />
+              <input id="clave" type={ver ? 'text' : 'password'} autoComplete="current-password" required value={clave} onChange={(e) => setClave(e.target.value)} />
+            </div>
+            <button type="button" className="boton-secundario" onClick={() => setVer(!ver)} aria-pressed={ver}><Icono nombre={ver ? 'ojoNo' : 'ojo'} />{ver ? 'Ocultar' : 'Ver'}</button>
           </div>
         </div>
         <button className="boton-primario boton-ancho" type="submit" disabled={enviando || !correo || !clave}>
-          {enviando ? 'Ingresando…' : 'Iniciar sesión'}
+          <Icono nombre="salir" />{enviando ? 'Ingresando…' : 'Iniciar sesión'}
         </button>
         <p className="texto-suave centrado">¿Olvidaste tu contraseña? Pide al administrador que la cambie.</p>
       </form>
+      <p className="pie-acceso">Prodmazul S.A. · Producción del Mar</p>
+      </div>
     </main>
   );
 }
