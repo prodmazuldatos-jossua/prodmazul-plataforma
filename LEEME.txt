@@ -1,7 +1,9 @@
-Ajustes de la aplicación (9 cambios)
-Contenido: apps/web/src (aplicación completa actualizada), supabase/migrations/20261020000012_ajustes_libras_usuarios_excel.sql,
-supabase/functions/admin-usuarios/index.ts (función de servidor para crear usuarios y cambiar contraseñas).
-NO incluye package.json: instala la librería del Excel con
-    cd apps/web
-    npm install fflate@0.8.3 --save-exact
-Siga el manual Manual_Ajustes.html paso a paso.
+Fase 5 - Parte 1: Cola y estado de sincronización (solo base de datos)
+Archivos nuevos:
+  supabase/migrations/20261020000013_sync_cola_estado.sql   (migración 13)
+  docs/prueba_parte1_f5.sql        (prueba que se pega en el SQL Editor de Supabase)
+  docs/consultas_sincronizacion.sql (consultas listas para ver y manejar la cola)
+  tests/sql/fase5_parte1.mjs       (prueba automática en tu PC, opcional)
+Archivos actualizados (pruebas antiguas):
+  tests/sql/parte1.mjs, tests/sql/parte8.mjs
+No cambia la aplicación web ni envía nada a Google todavía.

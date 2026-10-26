@@ -16,7 +16,7 @@ const CONS = '00000000-0000-0000-0000-000000000004';
 await db.exec(`
   create role anon nologin; create role authenticated nologin;
   create schema auth;
-  create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb default '{}');
+  create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb default '{}', last_sign_in_at timestamptz);
   create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.sub', true),'')::uuid $$;
   create schema storage;
   create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
@@ -49,7 +49,7 @@ await db.exec(`
 const hoy = (await db.query(`select (now() at time zone 'America/Guayaquil')::date as d`)).rows[0].d.toISOString().slice(0, 10);
 const nuevaR = (guia, extra = {}) => ({
   client_uuid: crypto.randomUUID(), estado: 'cerrado', fecha_llegada: hoy, lote_id: '123-456-789', proveedor: 'Prov', especie: 'Esp',
-  guia_remision: guia, llegada_en: 'gavetas', num_gavetas_bines: 3, libras_reportadas: 100, libras_planta: 99,
+  guia_remision: guia, llegada_en: 'gavetas', num_gavetas_bines: 3, libras_reportadas: 1000, libras_planta: 990,
   gavetas: [{ num_gaveta: 1, peso_lb: 50 }, { num_gaveta: 2, peso_lb: 49 }], temperaturas: [{ lectura_id: 1, num_gaveta: 2, temperatura_c: 2.5 }], ...extra });
 const crear = async (uid, guia, extra) => (await api(uid, 'api_m01_guardar_recepcion', nuevaR(guia, extra))).r;
 const ver = async (id, uid = ADMIN) => (await api(uid, 'api_m01_obtener_recepcion', id)).r;
@@ -90,10 +90,10 @@ l = await lista(CONS, { estado: 'eliminado' });
 ok('consulta no puede pedir «eliminado»', err(l, 'E_PERMISO'), l.e);
 
 console.log('\nEditar');
-let g = await api(OPER, 'api_m01_guardar_recepcion', nuevaR('G-1', { recepcion_id: r1.recepcion_id, version: r1.version, observacion: 'editada', libras_planta: 98 }));
+let g = await api(OPER, 'api_m01_guardar_recepcion', nuevaR('G-1', { recepcion_id: r1.recepcion_id, version: r1.version, observacion: 'editada', libras_planta: 980 }));
 ok('el autor edita su recepción cerrada y sube la versión', g.r?.version === r1.version + 1 && g.r?.estado === 'cerrado', JSON.stringify(g));
 let d = await ver(r1.recepcion_id);
-ok('el detalle muestra lo editado y el autor no cambia', d.observacion === 'editada' && Number(d.libras_planta) === 98 && d.creado_por === OPER && d.llegada_en === 'gavetas');
+ok('el detalle muestra lo editado y el autor no cambia', d.observacion === 'editada' && Number(d.libras_planta) === 980 && d.creado_por === OPER && d.llegada_en === 'gavetas');
 ok('el detalle trae gavetas, temperatura por gaveta y lote_cerrado', d.gavetas.length === 2 && d.temperaturas[0].num_gaveta === 2 && d.lote_cerrado === false);
 g = await api(OPER, 'api_m01_guardar_recepcion', nuevaR('G-1', { recepcion_id: r1.recepcion_id, version: r1.version }));
 ok('editar con una versión vieja da E_VERSION', err(g, 'E_VERSION'), g.e);
