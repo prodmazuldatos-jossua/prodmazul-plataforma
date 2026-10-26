@@ -1,0 +1,9 @@
+{
+  "name": "prodmazul-pruebas-exportador",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --import ./registrar.mjs exportador.test.mjs"
+  },
+  "devDependencies": { "@electric-sql/pglite": "^0.5.10" }
+}

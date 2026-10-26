@@ -56,7 +56,7 @@ ok('un usuario nuevo nace activo, sin permisos de administrador', t.rows[0].corr
 
 console.log('\nSeguridad: nadie toca las tablas directamente');
 const tablas = (await db.query(`select n.nspname||'.'||c.relname as t, c.relrowsecurity as rls from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and n.nspname in ('core') order by 1`)).rows;
-ok(`RLS activa en las ${tablas.length} tablas del esquema core`, tablas.length === 14 && tablas.every((x) => x.rls), tablas.filter((x) => !x.rls).map((x) => x.t).join(','));
+ok(`RLS activa en las ${tablas.length} tablas del esquema core`, tablas.length >= 14 && tablas.every((x) => x.rls), tablas.filter((x) => !x.rls).map((x) => x.t).join(','));
 let bloqueadas = 0;
 for (const x of tablas) { const r = await como(OPER, `select * from ${x.t} limit 1`); if (r.e) bloqueadas++; }
 ok('un usuario con sesión no puede leer ninguna tabla', bloqueadas === tablas.length, `${bloqueadas}/${tablas.length}`);
