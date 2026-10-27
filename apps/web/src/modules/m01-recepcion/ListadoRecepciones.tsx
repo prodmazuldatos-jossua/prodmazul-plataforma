@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Alerta, Cargando, Vacio } from '../../core/ui';
 import { mensajeDe } from '../../lib/errores';
@@ -21,6 +21,8 @@ export default function ListadoRecepciones() {
   const { puede } = useAuth();
   const { texto: peso } = useUnidad();
   const [params, setParams] = useSearchParams();
+  const { state: estadoNav } = useLocation() as { state: { aviso?: string } | null };
+  const avisoGuardado = estadoNav?.aviso ?? null;
   const estadoUrl = params.get('estado') ?? 'activos';
   const filtros: FiltrosListado = {
     busqueda: params.get('q') ?? '',
@@ -92,6 +94,7 @@ export default function ListadoRecepciones() {
           {puede('M01', 'crear') && <Link className="boton-primario enlace-boton" to="/m01/nueva"><Icono nombre="mas" />Nueva recepción</Link>}
         </div>
       </div>
+      {avisoGuardado && <Alerta tipo="exito">{avisoGuardado}</Alerta>}
       {avisoExcel && <Alerta tipo={avisoExcel.tipo}>{avisoExcel.texto}</Alerta>}
 
       <form className="filtros-lista" onSubmit={(e) => e.preventDefault()} aria-label="Filtros del listado">
@@ -146,7 +149,7 @@ export default function ListadoRecepciones() {
             <table className="tabla-lista">
               <thead>
                 <tr>
-                  <th>Recepción</th><th>Fecha</th><th>Lote</th><th>Proveedor / especie</th><th>Llegó</th>
+                  <th>Recepción</th><th>Fecha</th><th>Guía</th><th>Lote</th><th>Proveedor / especie</th><th>Llegó</th>
                   <th className="num">Reportadas</th><th className="num">Planta</th><th className="num">Diferencia</th>
                 </tr>
               </thead>
@@ -155,6 +158,7 @@ export default function ListadoRecepciones() {
                   <tr key={r.recepcion_id} className={`fila-${r.estado}`}>
                     <td><Link to={`/m01/${r.recepcion_id}`} aria-label={`Abrir la recepción ${r.recepcion_id}`}>{r.recepcion_id}</Link><br /><InsigniaEstado estado={r.estado} /></td>
                     <td>{formatoFecha(r.fecha_llegada)}</td>
+                    <td data-testid="celda-guia">{r.guia_remision}</td>
                     <td>{r.lote_id}</td>
                     <td className="celda-ancha">{r.proveedor_nombre}<br /><span className="texto-suave">{r.especie_nombre}</span></td>
                     <td>{textoCantidad(r.num_gavetas_bines, r.llegada_en)}</td>

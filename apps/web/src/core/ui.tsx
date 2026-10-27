@@ -30,12 +30,17 @@ interface ModalProps { titulo: string; children: ReactNode; onCerrar: () => void
 
 export function Modal({ titulo, children, onCerrar, acciones }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
+  // La función de cierre llega nueva en cada render (cada tecla escrita). Se guarda en una referencia para que el
+  // efecto corra UNA sola vez: antes se repetía en cada tecla y devolvía el foco al cuadro, cortando la escritura.
+  const cerrar = useRef(onCerrar);
+  cerrar.current = onCerrar;
   useEffect(() => {
+    const previo = document.activeElement as HTMLElement | null;
     ref.current?.focus();
-    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
+    const tecla = (e: KeyboardEvent) => { if (e.key === 'Escape') cerrar.current(); };
     window.addEventListener('keydown', tecla);
-    return () => window.removeEventListener('keydown', tecla);
-  }, [onCerrar]);
+    return () => { window.removeEventListener('keydown', tecla); previo?.focus?.(); };
+  }, []);
   return (
     <div className="modal-fondo" onMouseDown={(e) => { if (e.target === e.currentTarget) onCerrar(); }}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={titulo} tabIndex={-1} ref={ref}>

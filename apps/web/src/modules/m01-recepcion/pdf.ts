@@ -4,6 +4,7 @@ import { textoCantidad } from '../../lib/texto';
 import { FACTOR_LB_KG, type Unidad } from '../../lib/unidades';
 import { pesoPromedio, totalLibrasAprox } from './calculos';
 import type { RecepcionDetalle } from './tipos';
+import { matrizQr, textoQrFirma } from './qr';
 
 // ---- Datos fijos del formulario original -------------------------------------------------------------------
 export const PDF_CODIGO = 'PROM-M-P-P5-F1-C';
@@ -106,7 +107,7 @@ export function envolver(texto: string, fuente: { widthOfTextAtSize: (t: string,
 // ---- Dibujo -------------------------------------------------------------------------------------------------
 
 type Color = ReturnType<typeof rgb>;
-interface Ctx { doc: PDFDocument; normal: PDFFont; negrita: PDFFont; logo: PDFImage | null; r: RecepcionDetalle; op: OpcionesPdf }
+interface Ctx { doc: PDFDocument; normal: PDFFont; negrita: PDFFont; mono: PDFFont; monoNegrita: PDFFont; logo: PDFImage | null; r: RecepcionDetalle; op: OpcionesPdf }
 type Alin = 'izq' | 'centro' | 'der';
 
 const Y = (top: number) => ALTO - top; // las posiciones se miden desde arriba de la hoja
@@ -294,16 +295,51 @@ function observacion(c: Ctx, p: PDFPage, top: number, lineas: string[], minLinea
   return top + 8 + n * paso + 8;
 }
 
-function firmas(c: Ctx, p: PDFPage, top: number) {
+/** Dibuja un QR como cuadros negros (vectorial, nítido al imprimir) con su zona blanca alrededor. */
+function dibujarQr(p: PDFPage, texto: string, x: number, top: number, lado: number) {
+  const m = matrizQr(texto);
+  const n = m.length, mod = lado / n;
+  m.forEach((fila, f) => fila.forEach((osc, col) => {
+    if (osc) p.drawRectangle({ x: x + col * mod, y: Y(top + (f + 1) * mod), width: mod + 0.15, height: mod + 0.15, color: NEGRO });
+  }));
+}
+
+/** Palabras envueltas a un ancho máximo (para el nombre junto al QR). */
+function envolverPalabras(t: string, f: PDFFont, tam: number, ancho: number): string[] {
+  const out: string[] = []; let actual = '';
+  for (const pal of t.split(/\s+/).filter(Boolean)) {
+    const prueba = actual ? `${actual} ${pal}` : pal;
+    if (f.widthOfTextAtSize(prueba, tam) <= ancho || !actual) actual = prueba; else { out.push(actual); actual = pal; }
+  }
+  if (actual) out.push(actual);
+  return out;
+}
+
+export const ALTO_FIRMAS = 66;
+
+/** `libreDesde`: hasta dónde llega lo dibujado arriba; el QR se reduce (mínimo 28 pt) si la hoja está llena. */
+function firmas(c: Ctx, p: PDFPage, top: number, libreDesde = 0) {
   const w = 250, xs = [MARGEN + 70, ANCHO - MARGEN - 70 - w];
   const ets = ['REALIZADO POR', 'REVISADO POR'];
-  const nombre = [c.r.realizado_por_nombre ?? '', ''];
+  const yLinea = top + 50;
   xs.forEach((x, i) => {
-    linea(p, x, top + 22, x + w, top + 22, 0.8);
-    escribir(p, ets[i], x, top + 32, c.negrita, 8.5, { ancho: w, alin: 'centro' });
-    if (nombre[i]) escribir(p, nombre[i], x, top + 42, c.normal, 8.5, { ancho: w, alin: 'centro' });
-    else escribir(p, 'Nombre', x, top + 42, c.normal, 7, { ancho: w, alin: 'centro', color: GRIS });
+    linea(p, x, yLinea, x + w, yLinea, 0.8);
+    escribir(p, ets[i], x, yLinea + 10, c.negrita, 8.5, { ancho: w, alin: 'centro' });
   });
+  // Sobre la línea de «REALIZADO POR»: QR con el lote y el nombre, y el texto «Firmado electrónicamente por».
+  const nombre = limpiarTexto(c.r.realizado_por_nombre ?? '').trim();
+  const lote = limpiarTexto(c.r.lote_id ?? '').trim();
+  if (nombre || lote) {
+    const lado = Math.max(28, Math.min(40, yLinea - 4 - Math.max(libreDesde, top))), x = xs[0], yQr = yLinea - 4 - lado;
+    dibujarQr(p, textoQrFirma(lote, nombre), x, yQr, lado);
+    const xt = x + lado + 8, wt = w - lado - 8;
+    escribir(p, 'Firmado electrónicamente por:', xt, yQr + 9, c.mono, 7, { ancho: wt, color: GRIS });
+    if (nombre) {
+      let tam = 9.5, lineas = envolverPalabras(nombre.toUpperCase(), c.monoNegrita, tam, wt);
+      while (lineas.length > 2 && tam > 5.5) { tam -= 0.5; lineas = envolverPalabras(nombre.toUpperCase(), c.monoNegrita, tam, wt); }
+      lineas.slice(0, 2).forEach((l, k) => escribir(p, l, xt, yQr + 21 + k * (tam + 2), c.monoNegrita, tam, { ancho: wt }));
+    }
+  }
 }
 
 function marcaDeAgua(c: Ctx, p: PDFPage) {
@@ -349,7 +385,9 @@ export async function generarPdfRecepcion(r: RecepcionDetalle, op: OpcionesPdf):
   if (op.logo && op.logo.length > 0) {
     try { logo = await doc.embedPng(op.logo); } catch { logo = null; }
   }
-  const c: Ctx = { doc, normal, negrita, logo, r, op };
+  const mono = await doc.embedFont(StandardFonts.Courier);
+  const monoNegrita = await doc.embedFont(StandardFonts.CourierBold);
+  const c: Ctx = { doc, normal, negrita, mono, monoNegrita, logo, r, op };
   const nuevaHoja = () => doc.addPage([ANCHO, ALTO]);
 
   const lineasObs = envolver(r.observacion ?? '', normal, 8.5, ANCHO - 2 * MARGEN - 4);
@@ -371,10 +409,10 @@ export async function generarPdfRecepcion(r: RecepcionDetalle, op: OpcionesPdf):
     escribir(p1, `Continúa en la hoja siguiente: ${partes}.`, MARGEN, top + 6, c.normal, 7.5, { color: GRIS });
   }
   const topObs = binesExtra ? top + 8 : top;
-  const topFirmas = ALTO - 40 - 62;
+  const topFirmas = ALTO - 40 - ALTO_FIRMAS;
   if (!hayContinuacion) {
-    observacion(c, p1, topObs, lineasObs, 2);
-    firmas(c, p1, topFirmas);
+    const finObs = observacion(c, p1, topObs, lineasObs, 2);
+    firmas(c, p1, topFirmas, finObs);
   } else if (!binesExtra && !tempsExtra.length) {
     // Solo la observación es larga: se muestran 3 líneas aquí y el resto en la hoja siguiente.
     observacion(c, p1, topObs, lineasObs.slice(0, MAX_OBS_1), MAX_OBS_1, '(continúa en la hoja siguiente)');
@@ -411,8 +449,8 @@ export async function generarPdfRecepcion(r: RecepcionDetalle, op: OpcionesPdf):
     } else {
       t = observacion(c, p, t, restoObs, 2, '(continuación)');
     }
-    if (t + 62 > LIMITE) nueva();
-    firmas(c, p, Math.max(t + 6, ALTO - 40 - 62));
+    if (t + ALTO_FIRMAS > LIMITE) nueva();
+    firmas(c, p, Math.max(t + 6, ALTO - 40 - ALTO_FIRMAS));
   }
 
   // Pie de todas las hojas

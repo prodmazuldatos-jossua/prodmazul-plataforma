@@ -3,15 +3,19 @@ import { TemperaturaInput } from './controles';
 import { totalLibrasAprox } from './calculos';
 import { MAX_FILAS_ALMACENAMIENTO, filaAlmacenamientoVacia, type AlmacenamientoForm, type Errores } from './tipos';
 import { Icono } from '../../core/iconos';
+import BotonQrBin from './BotonQrBin';
+import type { DatosBin } from './qrBin';
 
 interface Props {
   filas: AlmacenamientoForm[];
   errores: Errores;
   onCambiar: (filas: AlmacenamientoForm[]) => void;
+  /** Datos de la recepción que van dentro del QR de cada bin. */
+  datosQr: DatosBin;
 }
 
 /** Sección 4: almacenamiento de materia prima. Filas con bin, sellos, temperatura y libras aproximadas. */
-export default function SeccionAlmacenamiento({ filas, errores, onCambiar }: Props) {
+export default function SeccionAlmacenamiento({ filas, errores, onCambiar, datosQr }: Props) {
   const { texto } = useUnidad();
   const cambiarFila = (i: number, cambio: Partial<AlmacenamientoForm>) => onCambiar(filas.map((f, k) => (k === i ? { ...f, ...cambio } : f)));
   const agregar = () => onCambiar([...filas, filaAlmacenamientoVacia()]);
@@ -58,6 +62,7 @@ export default function SeccionAlmacenamiento({ filas, errores, onCambiar }: Pro
                 <PesoInput id={`alm-${i}-lb`} compacto etiqueta="Libras aproximadas" value={f.libras_aprox}
                            onChange={(v) => cambiarFila(i, { libras_aprox: v })} error={e.libras_aprox} />
               </div>
+              <BotonQrBin numBin={f.num_bin.trim()} datos={datosQr} deshabilitado={!f.num_bin.trim() || !datosQr.lote.trim()} />
               <button type="button" className="boton-enlace" onClick={() => quitar(i)} aria-label={`Quitar el bin ${i + 1}`}>Quitar este bin</button>
             </div>
           );

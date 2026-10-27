@@ -37,6 +37,7 @@ const TRAZOS: Record<string, ReactNode> = {
   nube: <><path d="M7 18.5a4.5 4.5 0 0 1-.6-8.9A6 6 0 0 1 18 9.8a4.4 4.4 0 0 1-.5 8.7z" /><path d="M12 11v6m-2.5-2.5L12 17l2.5-2.5" /></>,
   balanza: <><path d="M12 4v16M6 20h12M5 7h14M5 7l-2.5 6a3 3 0 0 0 5 0zM19 7l-2.5 6a3 3 0 0 0 5 0z" /></>,
   termometro: <><path d="M10 14.5V5a2 2 0 0 1 4 0v9.5a4 4 0 1 1-4 0z" /><path d="M12 9v7" /></>,
+  qr: <><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" /><path d="M14 14h2.5v2.5H14zM18 14h2M14 18.5h2.5M18.5 18v2.5" /></>,
   caja: <><path d="M3.5 8 12 4l8.5 4v8L12 20l-8.5-4z" /><path d="M7.8 6 16 10v4M3.5 8 12 12l8.5-4M12 12v8" /></>,
   nota: <><path d="M6 3.5h9l4 4v13H6z" /><path d="M9 11h7M9 14.5h7M9 18h4" /></>,
   excel: <><path d="M6 3.5h8l4 4v13H6z" /><path d="M14 3.5v4h4M9.5 11.5l5 6M14.5 11.5l-5 6" /></>,

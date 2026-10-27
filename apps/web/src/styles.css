@@ -442,3 +442,7 @@ h1 > .icono { color: var(--azul-oscuro); margin-right: .45rem; vertical-align: -
 .etiqueta-parecido { margin-left: .5rem; background: #fff3cd; color: #6b5200; border: 1px solid #e6c860; border-radius: 999px; padding: .05rem .55rem; font-size: .75rem; font-weight: 700; }
 .fila-parecida { background: #fffdf4; }
 .tabla-scroll { position: relative; } /* contiene los textos ocultos de las cabeceras */
+
+/* Botón QR por bin */
+.boton-pequeno { padding: .35rem .7rem; min-height: 40px; font-size: .9rem; display: inline-flex; align-items: center; gap: .4rem; }
+.qr-bin { display: inline-flex; align-items: center; gap: .5rem; margin-right: 1rem; }

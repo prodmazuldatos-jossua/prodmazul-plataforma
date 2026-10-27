@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Alerta, Cargando, Modal, Vacio } from '../../core/ui';
 import { aApiError, mensajeDe } from '../../lib/errores';
@@ -11,6 +11,7 @@ import { useOnline } from '../../lib/conexion';
 import { anularRecepcion, devolverABorrador, eliminarRecepcion, obtenerRecepcion, reactivarRecepcion } from './api';
 import { pesoPromedio, redondear } from './calculos';
 import GaleriaFotos from './GaleriaFotos';
+import BotonQrBin from './BotonQrBin';
 import InsigniaEstado from './InsigniaEstado';
 import { capacidades } from './mapeo';
 import type { RecepcionDetalle } from './tipos';
@@ -34,6 +35,7 @@ function Dato({ etiqueta, children, id }: { etiqueta: string; children: ReactNod
 /** Vista de solo lectura de una recepción, con las acciones que tu rol permite. */
 export default function DetalleRecepcion() {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const { state } = useLocation() as { state: { aviso?: string } | null };
   const { perfil, puede } = useAuth();
   const online = useOnline();
@@ -108,6 +110,7 @@ export default function DetalleRecepcion() {
       else await reactivarRecepcion(r.recepcion_id, r.version);
       const hecho = { anular: 'La recepción quedó anulada.', eliminar: 'La recepción quedó eliminada.', reactivar: 'La recepción fue reactivada.', devolver: 'La recepción volvió a borrador: ya puedes editarla.' }[accion];
       cerrarModal();
+      if (accion === 'eliminar') { navigate('/m01', { state: { aviso: `La recepción ${r.recepcion_id} quedó eliminada y ya no aparece en el listado.` } }); return; }
       setAviso(hecho);
       await cargar();
     } catch (e) {
@@ -214,11 +217,12 @@ export default function DetalleRecepcion() {
           <>
             <div className="tabla-scroll" tabIndex={0} role="region" aria-label="Almacenamiento de materia prima">
               <table className="tabla-lista">
-                <thead><tr><th>Bin</th><th>Sellos recepción</th><th>Sellos almacenamiento</th><th className="num">Temp. °C</th><th className="num">Libras aprox.</th></tr></thead>
+                <thead><tr><th>Bin</th><th>Sellos recepción</th><th>Sellos almacenamiento</th><th className="num">Temp. °C</th><th className="num">Libras aprox.</th><th>Código QR</th></tr></thead>
                 <tbody>{r.almacenamiento.map((a) => (
                   <tr key={a.num_bin}><td>{a.num_bin}</td><td>{a.sellos_recepcion || '—'}</td><td>{a.sellos_almacenamiento || '—'}</td>
                     <td className="num">{a.temperatura_c === null ? '—' : `${Number(a.temperatura_c).toFixed(1)} °C`}</td>
-                    <td className="num">{a.libras_aprox === null ? '—' : peso(Number(a.libras_aprox))}</td></tr>
+                    <td className="num">{a.libras_aprox === null ? '—' : peso(Number(a.libras_aprox))}</td>
+                    <td><BotonQrBin numBin={a.num_bin} datos={{ lote: r.lote_id, fecha: r.fecha_llegada, guia: r.guia_remision, librasPlanta: r.libras_planta === null ? null : Number(r.libras_planta), proveedor: r.proveedor_nombre, especie: r.especie_nombre }} /></td></tr>
                 ))}</tbody>
               </table>
             </div>

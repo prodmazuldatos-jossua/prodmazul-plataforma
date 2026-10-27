@@ -78,7 +78,7 @@ export default function FormularioRecepcion(props: Omit<Props, 'onGuardadoNuevo'
   );
 }
 
-function FormularioInterno({ inicial, onRecargar, pendiente, onGuardadoNuevo }: Props) {
+function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
   const { perfil, puede } = useAuth();
   const navigate = useNavigate();
   const editando = Boolean(inicial);
@@ -192,16 +192,14 @@ function FormularioInterno({ inicial, onRecargar, pendiente, onGuardadoNuevo }: 
   /** Lo que sigue cuando la recepción y sus fotos quedaron resueltas. */
   const continuar = (r: RespuestaGuardar, estado: 'borrador' | 'cerrado') => {
     setPendienteFin(null);
-    if (editando) {
-      salidaLibre.current = true;
-      navigate(`/m01/${r.recepcion_id}`, { state: { aviso: estado === 'cerrado' ? (r.lote_cerrado ? 'Cambios guardados. El lote quedó cerrado.' : 'Cambios guardados.') : 'Borrador guardado.' } });
-      return;
-    }
-    const lote = f.lote_id.trim().toUpperCase();
     setSucio(false);
-    onGuardadoNuevo?.(estado === 'cerrado'
-      ? { tipo: 'exito', segundos: 8, texto: <>La recepción <strong>{r.recepcion_id}</strong> se guardó y quedó cerrada. {r.lote_cerrado ? <>El lote <strong>{lote}</strong> quedó <strong>cerrado</strong>.</> : <>El lote <strong>{lote}</strong> sigue <strong>abierto</strong>: puede llegar otro camión.</>} El formulario está listo para otra recepción.</> }
-      : { tipo: 'exito', segundos: 8, texto: <>Borrador <strong>{r.recepcion_id}</strong> guardado. Para completarlo búscalo en Recepciones y presiona <strong>Editar</strong>. El formulario está listo para otra recepción.</> });
+    // Después de guardar siempre se vuelve al listado, para comprobar que la recepción quedó registrada.
+    salidaLibre.current = true;
+    const lote = f.lote_id.trim().toUpperCase();
+    const aviso = estado === 'cerrado'
+      ? `La recepción ${r.recepcion_id} se guardó y quedó cerrada. ${r.lote_cerrado ? `El lote ${lote} quedó cerrado.` : `El lote ${lote} sigue abierto: puede llegar otro camión.`}`
+      : `Borrador ${r.recepcion_id} guardado. Para completarlo, ábrelo y presiona Editar.`;
+    navigate('/m01', { state: { aviso } });
   };
 
   const reintentarFotos = async () => {
@@ -238,12 +236,9 @@ function FormularioInterno({ inicial, onRecargar, pendiente, onGuardadoNuevo }: 
     setFotosNuevas([]);
     setSucio(false);
     if (navigator.onLine) void cola.sincronizar(uid);
-    if (pendiente) {
-      salidaLibre.current = true;
-      navigate('/m01/pendientes', { state: { aviso: 'Corregida. Se enviará en cuanto haya conexión.' } });
-    } else {
-      onGuardadoNuevo?.({ tipo: 'aviso', segundos: 20, texto: <>La recepción con guía <strong>{resumen.guia_remision}</strong> (lote <strong>{resumen.lote_id}</strong>) se guardó en <strong>este dispositivo</strong> y todavía <strong>no está en el servidor</strong>. Se enviará sola en cuanto haya conexión{fotos.length > 0 ? `, junto con ${fotos.length} foto${fotos.length === 1 ? '' : 's'}` : ''}. No borres los datos del navegador hasta que se envíe. El formulario está listo para otra recepción.</> });
-    }
+    salidaLibre.current = true;
+    if (pendiente) navigate('/m01/pendientes', { state: { aviso: 'Corregida. Se enviará en cuanto haya conexión.' } });
+    else navigate('/m01', { state: { aviso: `La recepción con guía ${resumen.guia_remision} (lote ${resumen.lote_id}) se guardó en este dispositivo y todavía no está en el servidor. Se enviará sola en cuanto haya conexión${fotos.length > 0 ? `, junto con ${fotos.length} foto${fotos.length === 1 ? '' : 's'}` : ''}. No borres los datos del navegador hasta que se envíe.` } });
     return true;
   };
 
@@ -392,7 +387,8 @@ function FormularioInterno({ inicial, onRecargar, pendiente, onGuardadoNuevo }: 
 
       <SeccionGavetas gavetas={f.gavetas} errores={errores} onCambiar={cambiarGaveta} />
       <SeccionTemperaturas lecturas={f.temperaturas} gavetas={f.gavetas} errores={errores} onCambiar={cambiarLecturas} />
-      <SeccionAlmacenamiento filas={f.almacenamiento} errores={errores} onCambiar={cambiarAlmacenamiento} />
+      <SeccionAlmacenamiento filas={f.almacenamiento} errores={errores} onCambiar={cambiarAlmacenamiento}
+        datosQr={{ lote: f.lote_id.trim().toUpperCase(), fecha: f.fecha_llegada, guia: f.guia_remision, librasPlanta: f.libras_planta === null || f.libras_planta === undefined ? null : Number(f.libras_planta), proveedor: f.proveedor, especie: f.especie }} />
 
       <section className="tarjeta tarjeta-ancha" id="seccion-cierre" aria-labelledby="sec5">
         <h2 id="sec5" className="titulo-seccion"><Icono nombre="ok" />5. Cierre</h2>
