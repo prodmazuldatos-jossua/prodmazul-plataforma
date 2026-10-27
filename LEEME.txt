@@ -1,10 +1,19 @@
-Fase 5 - Parte 7: Reportes (base de datos)
+Fase 5 - Parte 9: Administracion de usuarios y roles
 Archivos nuevos:
-  supabase/migrations/20261020000018_reportes_base.sql   (migracion 18: 3 funciones de reportes, solo lectura, y un indice)
-  docs/prueba_parte7_f5.sql          (prueba que se pega en el SQL Editor de Supabase; no deja datos)
-  tests/sql/fase5_parte7.mjs         (prueba automatica de la base, opcional)
-Archivos actualizados:
-  docs/consultas_exportador.sql      (consultas nuevas: 40 a 49, reportes y su comparacion «a mano»)
-Esta parte NO cambia la aplicacion web, ni el receptor de Google, ni la funcion sync-exportar: solo la base de datos.
-Los reportes se muestran en pantalla en la Parte 8. Reglas: libras planta; la semana empieza el lunes; no cuentan las
-recepciones anuladas ni eliminadas (ni los borradores, salvo que se pida); un lote cuenta una vez por periodo.
+  supabase/migrations/20261020000019_usuarios_auditoria.sql   (migracion 19: auditoria con antes/despues y historial de usuarios)
+  supabase/functions/admin-usuarios/nucleo.ts                  (logica de la funcion de servidor, version 2)
+  docs/prueba_parte9_f5.sql          (prueba que se pega en el SQL Editor de Supabase; no deja datos)
+  tests/sql/fase5_parte9.mjs         (prueba automatica de la base, opcional)
+  tests/usuarios/                    (pruebas de la funcion admin-usuarios, opcional)
+  tests/seguridad/                   (pruebas del verificador de seguridad, opcional)
+  tests/exportador/exportador.test.mjs   (corregido: la prueba usaba la fecha UTC y fallaba por la noche en Ecuador)
+  herramientas/verificar-seguridad.mjs   (busca claves expuestas en Git y en la aplicacion compilada)
+  web/src/core/admin/usuarios.ts, usuarios.test.ts
+Archivos actualizados (se reemplazan por las versiones nuevas):
+  supabase/functions/admin-usuarios/index.ts   (version 2: hay que volver a desplegarla)
+  docs/consultas_exportador.sql                (consultas nuevas: 50 a 54)
+  web/src/core/admin/api.ts, PaginaUsuarios.tsx, web/src/styles.css
+Esta parte NO cambia el receptor de Google ni sync-exportar.
+SI cambia la base (migracion 19), la funcion admin-usuarios (hay que desplegarla de nuevo) y la aplicacion web (probar, compilar y publicar).
+Las contrasenas nunca se guardan en la base ni en la auditoria, y nunca se escriben en el registro de la funcion.
+Secretos: no hay ninguno en esta parte.

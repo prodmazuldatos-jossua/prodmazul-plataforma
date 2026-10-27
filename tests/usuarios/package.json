@@ -1,0 +1,8 @@
+{
+  "name": "prodmazul-pruebas-usuarios",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types usuarios.test.mjs && node --experimental-strip-types --import ./registrar.mjs conexion.test.mjs"
+  }
+}

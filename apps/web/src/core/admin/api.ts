@@ -25,7 +25,7 @@ export async function actualizarUsuario(user: string, nombre: string, activo: bo
 }
 
 /** Crear usuarios y cambiar contraseñas pasa por la función de servidor admin-usuarios (necesita la clave de servicio). */
-async function llamarFuncion(body: Record<string, unknown>): Promise<void> {
+async function llamarFuncion(body: Record<string, unknown>): Promise<{ aviso?: string; version?: string }> {
   const { data, error } = await supabase.functions.invoke('admin-usuarios', { body });
   if (error) {
     const estado = (error as { context?: { status?: number } }).context?.status;
@@ -33,13 +33,26 @@ async function llamarFuncion(body: Record<string, unknown>): Promise<void> {
     if (/failed to fetch|network|load failed/i.test(error.message)) throw new Error('No hay conexión. Inténtalo cuando tengas señal.');
     throw new Error('No se pudo completar la acción. Inténtalo de nuevo.');
   }
-  const r = data as { ok?: boolean; error?: string } | null;
+  const r = data as { ok?: boolean; error?: string; aviso?: string; version?: string } | null;
   if (!r?.ok) throw new Error(r?.error ?? 'No se pudo completar la acción.');
+  return { aviso: r.aviso, version: r.version };
 }
 
 export const crearUsuario = (correo: string, nombre: string, clave: string, roles: { modulo_id: string; rol_id: string }[]) =>
   llamarFuncion({ accion: 'crear', correo, nombre, clave, roles });
+/** Pregunta a la función de servidor qué versión tiene instalada (solo el administrador general). */
+export const versionFuncionUsuarios = async () => (await llamarFuncion({ accion: 'version' })).version ?? null;
 export const cambiarClaveUsuario = (user: string, clave: string) => llamarFuncion({ accion: 'clave', user_id: user, clave });
+
+export interface EventoUsuario {
+  evento_id: number; creado_en: string; accion: string; quien: string | null;
+  usuario_id: string; usuario: string | null; usuario_correo: string | null; detalle: Record<string, unknown>;
+}
+export async function listarHistorial(n = 30): Promise<EventoUsuario[]> {
+  const { data, error } = await supabase.rpc('api_admin_historial_usuarios', { p_n: n });
+  if (error) throw aApiError(error);
+  return (data as { eventos: EventoUsuario[] }).eventos;
+}
 
 /** Contraseña temporal de 12 caracteres, sin letras que se confunden (0/O, 1/l/I). */
 export function generarClave(largo = 12): string {

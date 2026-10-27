@@ -209,7 +209,7 @@ console.log('\nExportador · flujo normal');
   await db.query('select core.sync_encolar_todo()');
   // 450 proveedores + una recepción real (con gavetas) + catálogos
   await db.exec(`insert into core.proveedores (nombre, nombre_normalizado) select 'Proveedor ' || g, 'proveedor ' || g from generate_series(1, 450) g`);
-  const rec = { estado: 'cerrado', fecha_llegada: new Date().toISOString().slice(0, 10), lote_id: '995-995-995', proveedor: 'PROVEEDOR 1', especie: 'LANGOSTINO', num_gavetas_bines: 3, libras_reportadas: 300, libras_planta: 295, guia_remision: 'G-1',
+  const rec = { estado: 'cerrado', fecha_llegada: new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10), lote_id: '995-995-995', proveedor: 'PROVEEDOR 1', especie: 'LANGOSTINO', num_gavetas_bines: 3, libras_reportadas: 300, libras_planta: 295, guia_remision: 'G-1',
     gavetas: [{ num_gaveta: 1, peso_lb: 50 }, { num_gaveta: 2, peso_lb: 51 }, { num_gaveta: 3, peso_lb: 52 }], client_uuid: '11111111-1111-4111-8111-111111111111' };
   const gr = await comoUsuario(ADMIN, `select public.api_m01_guardar_recepcion('${JSON.stringify(rec)}'::jsonb)`);
   t('se guardó una recepción de prueba', gr.error === null, gr.error);
@@ -399,7 +399,7 @@ console.log('\nRespaldo de fotos en Drive (Parte 4)');
   G.red = (u) => { descargas.push(u); return { codigo: 200, bytes: jpg(1200) }; };
   const firmar = async (ruta) => ({ url: `https://abcd1234.supabase.co/storage/v1/object/sign/m01-recepcion-fotos/${ruta}?token=eyJhbGciOi.JIUzI1NiIs_x-y` });
   const dd = (extra = {}) => deps({ firmar, ...extra });
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
   const rec = { estado: 'cerrado', fecha_llegada: hoy, lote_id: '995-995-995', proveedor: 'PROVEEDOR 1', especie: 'LANGOSTINO', num_gavetas_bines: 1, libras_reportadas: 100, libras_planta: 99, guia_remision: 'G-F4',
     gavetas: [{ num_gaveta: 1, peso_lb: 99 }], client_uuid: '22222222-2222-4222-8222-222222222222' };
   const gr = await comoUsuario(ADMIN, `select public.api_m01_guardar_recepcion('${JSON.stringify(rec)}'::jsonb)`);
@@ -562,7 +562,7 @@ console.log('\nRetención de 60 días (Parte 5)');
     return {};
   };
   const dd = (extra = {}) => deps({ firmar, borrar, ...extra });
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
   let n = 0;
   const nuevaRec = async () => {
     n++;

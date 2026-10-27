@@ -257,3 +257,36 @@ select estado, count(*) as recepciones, sum(libras_planta) as libras_planta
 from m01_recepcion.recepciones
 where fecha_llegada between date_trunc('year', now() at time zone 'America/Guayaquil')::date and (now() at time zone 'America/Guayaquil')::date
 group by estado order by estado;
+
+-- ================= Fase 5 · Parte 9: usuarios =================
+-- 50) Lista de usuarios (función de la aplicación): correo, nombre, estado y roles. Cópiala ENTERA y ejecútala con un solo Run.
+select f.correo, f.nombre, f.activo, f.es_admin_general, f.roles
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_admin_listar_usuarios() as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'usuarios') as f(correo text, nombre text, activo boolean, es_admin_general boolean, roles jsonb)
+order by f.es_admin_general desc, lower(f.nombre);
+
+-- 51) LO MISMO «A MANO» (sin usar la función): debe dar los mismos usuarios, estados y roles que la consulta 50
+select p.correo, p.nombre, p.activo, p.es_admin_general,
+       coalesce((select jsonb_agg(jsonb_build_object('modulo_id', r.modulo_id, 'rol_id', r.rol_id) order by r.modulo_id) from core.usuario_modulo_rol r where r.user_id = p.user_id), '[]'::jsonb) as roles
+from core.perfiles p
+order by p.es_admin_general desc, lower(p.nombre);
+
+-- 52) Historial de cambios de usuarios (función): los últimos 20 eventos, del más nuevo al más antiguo
+select f.creado_en, f.accion, f.quien, f.usuario_correo, f.detalle
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_admin_historial_usuarios(20) as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'eventos') as f(creado_en timestamptz, accion text, quien text, usuario_correo text, detalle jsonb);
+
+-- 53) Revisión: ¿alguna auditoría de usuarios guardó una contraseña? DEBE dar 0 en las dos columnas
+select count(*) filter (where detalle::text ~* '(password|contrase)') as eventos_con_password,
+       count(*) filter (where detalle ? 'clave') as eventos_con_clave
+from core.auditoria
+where entidad = 'usuario';
+
+-- 54) Usuarios desactivados (conservan su rol, pero no pueden trabajar)
+select correo, nombre,
+       (select string_agg(r.modulo_id || ': ' || r.rol_id, ', ') from core.usuario_modulo_rol r where r.user_id = p.user_id) as roles
+from core.perfiles p
+where not activo
+order by lower(nombre);

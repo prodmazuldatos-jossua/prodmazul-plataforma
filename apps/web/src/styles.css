@@ -419,3 +419,11 @@ h1 > .icono { color: var(--azul-oscuro); margin-right: .45rem; vertical-align: -
   .atajos .boton-chico { flex: 1 1 45%; }
   .filtros-reportes .campo { min-width: 100%; }
 }
+
+/* ---- Fase 5 · Parte 9: usuarios ---- */
+.historial-usuarios { margin: 1.5rem 0 2rem; background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio-tarjeta); padding: .5rem 1rem; box-shadow: var(--sombra); }
+.historial-usuarios summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; color: var(--marino); cursor: pointer; }
+.historial-usuarios summary:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+.lista-historial { list-style: none; margin: .5rem 0 1rem; padding: 0; }
+.lista-historial li { padding: .55rem 0; border-top: 1px solid var(--linea); overflow-wrap: anywhere; }
+.lista-historial li:first-child { border-top: 0; }

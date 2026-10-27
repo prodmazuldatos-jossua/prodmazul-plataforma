@@ -1,0 +1,6 @@
+{
+  "name": "prodmazul-pruebas-seguridad",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node seguridad.test.mjs" }
+}
