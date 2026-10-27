@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Prodmazul · Manual del administrador</title>
+<title>Prodmazul · Manual breve del administrador</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
@@ -116,8 +116,8 @@ pre button:hover { background: var(--azul); }
   <main id="contenido">
 <h1 id="prodmazul-manual-breve-del-administrador-modulo-1-recepcion">Prodmazul · Manual breve del administrador · Módulo 1: Recepción</h1>
 <p><strong>Para quién es:</strong> la persona responsable de la plataforma (cuentas, permisos, copias de seguridad).
-<strong>Qué vas a poder hacer:</strong> crear y desactivar usuarios, asignar roles, cambiar contraseñas, anular/eliminar/reactivar recepciones, reabrir un lote, ver la auditoría y mantener copias de seguridad que <strong>sí se pueden restaurar</strong>.
-<strong>Tiempo de lectura:</strong> 25 minutos.</p>
+<strong>Qué vas a poder hacer:</strong> crear y desactivar usuarios desde la aplicación, asignar roles, cambiar contraseñas, anular/eliminar/reactivar recepciones, reabrir lotes, ver la auditoría, vigilar el respaldo en Google, ajustar la configuración, unir proveedores o especies repetidos y mantener copias que <strong>sí se pueden restaurar</strong>.
+<strong>Tiempo de lectura:</strong> 35 minutos.</p>
 <blockquote>
 <p><strong>Regla de oro.</strong> Contraseñas, claves (<code>service_role</code>, contraseña de la base de datos) y tokens <strong>nunca</strong> se escriben en el chat, en el código, en Git, ni se mandan por correo o mensaje. Guárdalas en tu gestor de contraseñas (Bitwarden).</p>
 <p><strong>Cómo leer las consultas SQL.</strong> Se ejecutan en <strong>Supabase &gt; SQL Editor &gt; New query</strong>. Pega <strong>una consulta a la vez</strong>, reemplaza lo que está en MAYÚSCULAS entre comillas simples (<code>'CORREO_DEL_USUARIO'</code>), presiona <strong>Run</strong> y comprueba el resultado. Los archivos están en la carpeta <code>docs\</code> del repositorio, <code>consultas_administracion.sql</code> es el principal.</p>
@@ -152,6 +152,16 @@ pre button:hover { background: var(--azul); }
 <td><strong>Tu PC</strong> (<code>C:\Proyectos\prodmazul-plataforma</code>)</td>
 <td>Código, copias de seguridad y pruebas locales</td>
 <td>Carpeta del repositorio</td>
+</tr>
+<tr>
+<td><strong>Google (cuenta DATOS)</strong></td>
+<td>Espejo de solo lectura en <strong>Sheets</strong> (un libro por año) y copia de las <strong>fotos</strong> en <strong>Drive</strong></td>
+<td>Menú &gt; <strong>Estado del respaldo</strong></td>
+</tr>
+<tr>
+<td><strong>Pantallas de administración</strong></td>
+<td>Usuarios, Configuración, Auditoría, Lotes, Catálogo y Estado del respaldo</td>
+<td>Menú de la aplicación (solo con permiso de administración)</td>
 </tr>
 </tbody>
 </table></div>
@@ -288,7 +298,8 @@ returning email, updated_at;
 <p><strong>Desde la aplicación</strong> (inicia sesión como administrador): abre la recepción &gt; botones <strong>Anular</strong>, <strong>Eliminar</strong> o <strong>Reactivar</strong> &gt; escribe el <strong>motivo</strong> (de 5 a 500 caracteres) &gt; confirma. <strong>Reactivar</strong> devuelve la recepción al estado que tenía antes. Estas acciones <strong>necesitan señal</strong>.</p>
 <p><strong>Todo queda en la auditoría</strong> (sección 9): quién, cuándo y por qué.</p>
 <h3 id="reabrir-un-lote-cerrado">Reabrir un lote cerrado</h3>
-<p>Un lote cerrado no admite camiones nuevos. Si se cerró por error:</p>
+<p>Un lote cerrado no admite camiones nuevos. Si se cerró por error, <strong>desde la aplicación</strong>: menú &gt; <strong>Lotes</strong> &gt; busca el lote &gt; <strong>Reabrir</strong> &gt; escribe el <strong>motivo</strong> &gt; confirma. Queda en la auditoría.</p>
+<p>Alternativa por consulta (si la pantalla no estuviera disponible):</p>
 <ol>
 <li>Abre <code>docs\reabrir_lote.sql</code>, reemplaza <code>LOTE_A_REABRIR</code> (aparece <strong>dos veces</strong>) por el lote, por ejemplo <code>123-456-789</code>.</li>
 <li>Pégalo completo en el SQL Editor &gt; <strong>Run</strong>.</li>
@@ -321,7 +332,7 @@ returning email, updated_at;
 </tr>
 </tbody>
 </table></div>
-<p><strong>No incluye las fotos</strong> (viven en el almacenamiento de Supabase; en la Fase 5 se respaldarán en Drive).</p>
+<p><strong>No incluye las fotos</strong>: viven en Supabase y, además, se copian solas a <strong>Drive</strong> (sección 13). Las <strong>recepciones</strong> también están en el espejo de Sheets, pero Sheets <strong>no es el sistema principal</strong> y no guarda el contador de numeración: la copia diaria sigue siendo tu respaldo principal.</p>
 <h3 id="82-como-hacerla">8.2. Cómo hacerla</h3>
 <ol>
 <li>Abre <strong>Docker Desktop</strong> y espera <strong>Engine running</strong>.</li>
@@ -360,11 +371,12 @@ npx supabase start
 <ol>
 <li><strong>No improvises ni borres nada.</strong> Avísame con el mensaje de error y la fecha de la última copia buena.</li>
 <li>El camino general es: crear un proyecto nuevo en Supabase &gt; aplicar las migraciones del repositorio (<code>npx supabase db push</code>) &gt; cargar <code>cuentas-FECHA.sql</code> y <code>datos-FECHA.sql</code> &gt; cambiar <code>.env.local</code> y las variables de Cloudflare a la URL y clave del proyecto nuevo &gt; crear de nuevo el bucket de fotos con <code>db push</code> (ya viene en las migraciones).</li>
-<li>Lo que se pierde: <strong>las fotos</strong> y lo registrado <strong>después</strong> de la última copia.</li>
+<li>Lo que se pierde: lo registrado <strong>después</strong> de la última copia (o del último envío a Sheets). Las <strong>fotos</strong> se recuperan de Drive (sección 14).</li>
 </ol>
 <hr />
 <h2 id="9-ver-la-auditoria">9. Ver la auditoría</h2>
-<p>Quién hizo qué y cuándo (las 50 acciones más recientes):</p>
+<p><strong>Desde la aplicación:</strong> menú &gt; <strong>Auditoría</strong>. Filtra por fecha, persona, acción o recepción; muestra 30 por página. Es de solo lectura.</p>
+<p>Por consulta (las 50 acciones más recientes):</p>
 <pre><code class="language-sql">select a.creado_en, p.correo as usuario, a.modulo_id, a.accion, a.entidad, a.entidad_id, a.resultado
 from core.auditoria a
 left join core.perfiles p on p.user_id = a.user_id
@@ -378,7 +390,8 @@ limit 50;
 <li><strong>Base de datos:</strong> pega <code>docs\revision_seguridad_parte12.sql</code> en el SQL Editor &gt; <strong>Run</strong>. Todas las filas deben decir <strong>CORRECTO</strong>.</li>
 <li><strong>Desde fuera:</strong> en PowerShell, <code>powershell.exe -ExecutionPolicy Bypass -File .\docs\revision_acceso_anonimo_parte12.ps1</code> (te pide la URL, la clave <strong>pública</strong> y la dirección del sitio). Debe terminar con <strong>0 con fallo</strong>.</li>
 <li><strong>Supabase &gt; Advisors &gt; Security Advisor:</strong> no deben aparecer errores en rojo (los avisos amarillos se me envían para revisarlos).</li>
-<li><strong>Usuarios:</strong> con la consulta de la sección 4, revisa que solo estén activos quienes siguen trabajando.</li>
+<li><strong>Revisión ampliada (Fase 5):</strong> pega <code>docs\revision_seguridad_f5.sql</code> en el SQL Editor &gt; <strong>Run</strong>. Es de solo lectura, no muestra valores de secretos y debe dejar <strong>todas las filas en OK</strong>; ninguna en <strong>CRITICO</strong>.</li>
+<li><strong>Usuarios:</strong> desde la pantalla <strong>Usuarios</strong> (o con la consulta de la sección 4), revisa que solo estén activos quienes siguen trabajando.</li>
 </ol>
 <hr />
 <h2 id="11-actualizar-la-aplicacion">11. Actualizar la aplicación</h2>
@@ -441,6 +454,56 @@ limit 50;
 </tr>
 </tbody>
 </table></div>
+<hr />
+<h2 id="13-respaldo-en-google-sheets-y-drive">13. Respaldo en Google (Sheets y Drive)</h2>
+<p>Menú &gt; <strong>Estado del respaldo</strong> muestra cuándo fue el último envío, cuántos registros esperan y si hubo errores. Cada <strong>2 horas</strong> el sistema envía los cambios a un libro de <strong>Sheets por año</strong> (11 hojas: proveedores, especies, lotes, perfiles, usuario_modulo_rol, config, recepciones, recepcion_gavetas, recepcion_temperaturas, recepcion_almacenamiento y fotos_meta). Las fotos se copian a <strong>Drive</strong> en <code>Prodmazul_Respaldo_Fotos/M01_Recepcion/AAAA/MM/REC-…/foto_NN.ext</code>.</p>
+<ul>
+<li><strong>Sheets es un espejo de solo lectura.</strong> Nunca edites ahí: lo que cambies se pisa en el próximo envío y <strong>no vuelve</strong> a Supabase.</li>
+<li>Si pasan más de <strong>6 horas</strong> sin sincronizar (parámetro <code>sync_alerta_horas</code>), la pantalla lo avisa en rojo.</li>
+<li><strong>Las fotos se borran de Supabase a los 60 días</strong> solo si tienen <strong>copia confirmada en Drive</strong> y la purga está encendida. <strong>No la enciendas</strong> hasta que el receptor responda versión <strong>2.2</strong> (<code>ping</code>).</li>
+<li>No hay correos de aviso: la alerta se ve en la aplicación.</li>
+</ul>
+<h2 id="14-restaurar-desde-google-o-desde-la-copia-local">14. Restaurar desde Google o desde la copia local</h2>
+<p><strong>Siempre se prueba primero en tu PC (Docker local), nunca en el proyecto real.</strong> La guía de la Parte 11 trae el paso a paso.</p>
+<div class="tabla"><table>
+<thead>
+<tr>
+<th>Si pasó…</th>
+<th>Qué usar</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Se perdieron datos y Supabase no tiene copia</td>
+<td>Descargar cada hoja del libro de Sheets como <strong>CSV</strong> y ejecutar <code>node herramientas/restaurar-desde-sheets.mjs --carpeta &lt;carpeta con los CSV&gt;</code>; luego aplicar el <code>restauracion.sql</code> generado</td>
+<td>Reaparecen proveedores, especies, lotes, recepciones, gavetas, temperaturas, almacenamiento y fotos_meta; la numeración continúa</td>
+</tr>
+<tr>
+<td>Faltan las fotos</td>
+<td>Descargar la carpeta <code>M01_Recepcion</code> de Drive y ejecutar <code>node herramientas/restaurar-fotos.mjs --fotos-meta &lt;fotos_meta.csv&gt; --carpeta &lt;carpeta&gt;</code> (la clave de servicio va en una variable de entorno, <strong>nunca</strong> en el chat)</td>
+<td>Las fotos vuelven al almacenamiento y se quita la marca de «purgada»</td>
+</tr>
+<tr>
+<td>Necesitas el estado de un día concreto</td>
+<td><code>restaurar-copia-local.ps1 -Fecha AAAA-MM-DD</code> (copia diaria, solo en la base <strong>local</strong>)</td>
+<td>Datos de ese día en Docker, para consultar o comparar</td>
+</tr>
+</tbody>
+</table></div>
+<p>Límites: las cuentas de acceso deben existir antes (se restauran desde <code>cuentas-FECHA.sql</code>); por defecto no se restauran usuarios ni configuración (opciones <code>--incluir-usuarios</code> y <code>--incluir-config</code>); repetir la restauración <strong>no duplica</strong> nada.</p>
+<h2 id="15-configuracion-catalogo-y-usuarios-pantallas">15. Configuración, catálogo y usuarios (pantallas)</h2>
+<ul>
+<li><strong>Configuración</strong> (menú): solo 8 parámetros, cada uno con límites: días de retención de fotos (7–3650), horas de gracia de la purga (1–720), máximo por corrida de purga (1–1000), factor libras→kg (2,2–2,21), máximo de fotos por recepción (1–20), formato del lote, horas de alerta de sincronización (1–168) y días de historial de envíos (1–365). Cada cambio queda en la auditoría.</li>
+<li><strong>Catálogo:</strong> si hay proveedores o especies repetidos (por ejemplo «Mar Azul» y «MarAzul»), usa <strong>Unir</strong>: el nombre que sobra pasa a ser un <strong>alias</strong>, las recepciones y lotes pasan al nombre que queda, y la acción se audita. <strong>No se deshace</strong> desde la pantalla.</li>
+<li><strong>Usuarios:</strong> crear, cambiar rol, desactivar/reactivar y cambiar contraseña desde la aplicación (la contraseña <strong>nunca</strong> se muestra ni se guarda en el historial). Las consultas de las secciones 3 a 6 quedan como alternativa.</li>
+</ul>
+<h2 id="16-plan-pro-de-supabase-y-almacenamiento-de-la-cuenta-datos">16. Plan Pro de Supabase y almacenamiento de la cuenta DATOS</h2>
+<ul>
+<li><strong>Plan gratuito:</strong> sin copias automáticas y el proyecto se <strong>pausa tras 1 semana sin actividad</strong>. <strong>Pro</strong> (desde unos 25 USD al mes) agrega copias diarias de 7 días y no se pausa. La recuperación a un punto exacto (PITR) es un <strong>extra de pago</strong>.</li>
+<li><strong>Cuenta DATOS (Google):</strong> cuando Drive se acerque a su límite, contrata <strong>Google One</strong> o <strong>Workspace</strong>. El precio depende de tu país: <strong>lee el que te muestra tu pantalla de compra</strong>.</li>
+<li>Pasar a Pro <strong>no cambia</strong> URL, claves ni datos. Después del cambio, revisa <strong>Estado del respaldo</strong> y la revisión de seguridad.</li>
+</ul>
   </main>
 </div>
 <script>
@@ -492,7 +555,7 @@ limit 50;
   });
 
   // casillas con memoria en este navegador
-  var clave = 'prodmazul-manual-adm';
+  var clave = 'manual-admin-f5';
   var guardado = {};
   try { guardado = JSON.parse(localStorage.getItem(clave) || '{}'); } catch (e) {}
   var cajas = contenido.querySelectorAll('li.casilla input');

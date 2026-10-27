@@ -1,15 +1,11 @@
-Fase 5 - Parte 10: Configuracion, auditoria, reabrir lotes y catalogo
+Fase 5 - Parte 11: Aceptacion y cierre de la Fase 5
 Archivos nuevos:
-  supabase/migrations/20261020000020_config_auditoria_lotes_catalogo.sql   (migracion 20)
-  docs/prueba_parte10_f5.sql         (prueba que se pega en el SQL Editor de Supabase; no deja datos)
-  tests/sql/fase5_parte10.mjs        (prueba automatica de la base, opcional)
-  web/src/core/administracion/       (api.ts, administracion.ts, administracion.test.ts y las 4 pantallas:
-                                      PaginaConfiguracion, PaginaAuditoria, PaginaLotes, PaginaCatalogo)
-Archivos actualizados (se reemplazan por las versiones nuevas):
-  docs/consultas_exportador.sql      (consultas nuevas: 55 a 59)
-  web/src/App.tsx, web/src/core/Layout.tsx, web/src/styles.css
-Esta parte NO cambia el receptor de Google, ni sync-exportar, ni admin-usuarios.
-SI cambia la base (migracion 20) y la aplicacion web (probar, compilar y publicar).
-La migracion reemplaza "reabrir lote": ahora pide un motivo (la version sin motivo desaparece).
-La migracion no borra ni modifica recepciones, lotes ni catalogos existentes.
-Secretos: no hay ninguno en esta parte.
+  herramientas/csv.mjs, restaurar-desde-sheets.mjs, restaurar-fotos.mjs   (restauracion desde Sheets y Drive)
+  tests/restauracion/        (28 pruebas de las herramientas; npm test)
+  tests/sql/fase5_parte11.mjs (prueba completa opcional: base -> CSV -> base vacia -> comparacion)
+  docs/revision_seguridad_f5.sql (revision de seguridad de SOLO LECTURA para el SQL Editor)
+  docs/manuales/             (Manual del operador, Manual del administrador e Informe de cierre de la Fase 5)
+Archivos incluidos sin cambios: herramientas/verificar-seguridad.mjs
+Esta parte NO cambia la base (sin migracion), ni la aplicacion web, ni el receptor, ni las Edge Functions.
+Las herramientas NO se conectan a tu base real: leen archivos y escriben SQL que tu decides donde ejecutar.
+Secretos: ninguno. La clave de servicio de restaurar-fotos se define solo en la ventana (variable de entorno), nunca en un archivo.
