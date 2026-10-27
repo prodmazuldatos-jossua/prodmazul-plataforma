@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import PaginaReportes from './reportes/PaginaReportes';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Vacio } from '../../core/ui';
 import DetalleRecepcion from './DetalleRecepcion';
@@ -24,6 +25,14 @@ function SoloVer({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function SoloReportes({ children }: { children: React.ReactNode }) {
+  const { puede } = useAuth();
+  if (!puede('M01', 'ver_reportes')) {
+    return <Vacio titulo="Sin permiso"><p>Tu rol no permite ver los reportes.</p></Vacio>;
+  }
+  return <>{children}</>;
+}
+
 export default function PaginaM01() {
   return (
     <Routes>
@@ -31,6 +40,7 @@ export default function PaginaM01() {
       <Route path="nueva" element={<SoloCrear><FormularioRecepcion /></SoloCrear>} />
       <Route path="pendientes" element={<SoloCrear><PaginaPendientes /></SoloCrear>} />
       <Route path="pendientes/:uuid" element={<SoloCrear><CorregirPendiente /></SoloCrear>} />
+      <Route path="reportes" element={<SoloReportes><PaginaReportes /></SoloReportes>} />
       <Route path=":id" element={<SoloVer><DetalleRecepcion /></SoloVer>} />
       <Route path=":id/editar" element={<SoloVer><EdicionRecepcion /></SoloVer>} />
       <Route path="*" element={<SoloVer><ListadoRecepciones /></SoloVer>} />

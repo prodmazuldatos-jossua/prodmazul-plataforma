@@ -374,3 +374,48 @@ h1 > .icono { color: var(--azul-oscuro); margin-right: .45rem; vertical-align: -
 .error-respaldo-tecnico { font-family: ui-monospace, Consolas, monospace; font-size: .8rem; color: var(--suave); background: var(--hielo); padding: .4rem .6rem; border-radius: 8px; white-space: pre-wrap; }
 .etiqueta-agotada { margin-left: .5rem; background: var(--rojo); color: #fff; border-radius: 999px; padding: .05rem .55rem; font-size: .75rem; font-weight: 700; }
 @media (max-width: 520px) { .chip-respaldo { font-size: .8rem; padding: .2rem .55rem; } }
+
+/* ---- Fase 5 · Parte 8: panel de reportes ---- */
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.etiqueta-grupo { font-weight: 700; color: var(--marino); font-size: .95rem; }
+.filtros-reportes .campo-check { justify-content: flex-end; min-height: 44px; }
+.filtros-reportes .campo-check label { display: flex; gap: .5rem; align-items: center; min-height: 44px; font-weight: 600; }
+.filtros-reportes .campo-check input { width: 1.4rem; height: 1.4rem; }
+.atajos { display: flex; flex-wrap: wrap; gap: .5rem; flex-basis: 100%; }
+.boton-chico { min-height: 40px; padding: .35rem .8rem; font-size: .9rem; }
+.tabs { display: flex; gap: .25rem; overflow-x: auto; border-bottom: 2px solid var(--linea); margin-bottom: 1rem; scrollbar-width: thin; }
+.tabs [role="tab"] { flex: 0 0 auto; min-height: 46px; padding: .5rem 1rem; border: 0; border-bottom: 4px solid transparent; background: transparent; color: var(--marino); font-weight: 700; cursor: pointer; white-space: nowrap; }
+.tabs [role="tab"].activo { color: var(--azul-oscuro); border-bottom-color: var(--azul-oscuro); }
+.tabs [role="tab"]:focus-visible { outline: 3px solid var(--azul); outline-offset: -3px; }
+.panel-reporte { margin-bottom: 1rem; }
+.nota-reporte { color: var(--marino); margin: 0 0 .75rem; font-size: .95rem; }
+.tarjetas-reporte { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin: 0 0 1rem; }
+.tarjeta-reporte { background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio-tarjeta); padding: .75rem 1rem; box-shadow: var(--sombra); }
+.tarjeta-reporte dt { font-size: .85rem; color: var(--marino); font-weight: 600; }
+.tarjeta-reporte dd { margin: .15rem 0 0; font-size: 1.35rem; font-weight: 800; color: var(--azul-oscuro); overflow-wrap: anywhere; }
+.grafico { margin: 0 0 1rem; background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio-tarjeta); padding: .75rem 1rem; box-shadow: var(--sombra); }
+.grafico figcaption { font-weight: 700; color: var(--marino); margin-bottom: .25rem; }
+.grafico-unidad { font-weight: 500; }
+.grafico svg { width: 100%; height: auto; display: block; }
+.g-barra { fill: var(--azul-oscuro); }
+.g-guia { stroke: var(--linea); stroke-width: 1; }
+.g-eje, .g-etq, .g-valor { font-size: 12px; fill: #36505c; }
+.g-valor { font-weight: 700; }
+.grafico-nota { font-size: .85rem; color: #36505c; margin: .4rem 0 0; }
+.tabla-scroll { overflow-x: auto; margin-bottom: 1rem; background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio-tarjeta); }
+.tabla-scroll:focus-visible { outline: 3px solid var(--azul); }
+.tabla-reporte { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: .95rem; }
+.tabla-reporte caption { text-align: left; font-weight: 800; padding: .6rem .8rem; color: var(--marino); }
+.tabla-reporte th, .tabla-reporte td { padding: .5rem .8rem; border-top: 1px solid var(--linea); text-align: left; }
+.tabla-reporte thead th { background: var(--hielo); }
+.tabla-reporte .der { text-align: right; font-variant-numeric: tabular-nums; }
+.tabla-reporte tbody th { font-weight: 600; }
+.tabla-reporte tfoot th, .tabla-reporte tfoot td { font-weight: 800; background: var(--hielo); }
+.tabla-scroll .grafico-nota { padding: 0 .8rem .6rem; }
+.descargas-reporte { display: flex; flex-wrap: wrap; gap: .5rem .75rem; align-items: center; margin-bottom: 2rem; }
+@media (max-width: 600px) {
+  .g-eje, .g-etq, .g-valor { font-size: 20px; }
+  .descargas-reporte button { flex: 1 1 100%; }
+  .atajos .boton-chico { flex: 1 1 45%; }
+  .filtros-reportes .campo { min-width: 100%; }
+}

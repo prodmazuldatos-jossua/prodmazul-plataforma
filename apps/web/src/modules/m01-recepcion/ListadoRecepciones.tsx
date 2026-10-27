@@ -82,6 +82,7 @@ export default function ListadoRecepciones() {
       <div className="encabezado-lista">
         <h1><Icono nombre="recepcion" tamano={28} />Recepciones</h1>
         <div className="acciones-fila acciones-detalle">
+          {puede('M01', 'ver_reportes') && <Link className="boton-secundario enlace-boton" to="/m01/reportes" data-testid="enlace-reportes"><Icono nombre="lista" />Reportes</Link>}
           {puede('M01', 'ver_reportes') && (
             <button type="button" className="boton-secundario" data-testid="boton-excel" disabled={exportando || !online} onClick={() => void exportar()}
                     title={online ? 'Descarga todas las recepciones con todas sus columnas' : 'Necesitas conexión para descargar el Excel'}>

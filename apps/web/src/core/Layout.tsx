@@ -49,7 +49,7 @@ export default function Layout() {
   }, [menuAbierto]);
 
   const modulo = modulos.find((m) => pathname === m.ruta || pathname.startsWith(`${m.ruta}/`));
-  const titulo = pathname === '/' ? 'Inicio' : pathname.startsWith('/cuenta') ? 'Mi cuenta' : pathname.startsWith('/admin/usuarios') ? 'Usuarios' : pathname.startsWith('/admin/respaldo') ? 'Estado del respaldo' : modulo?.nombre ?? 'Prodmazul';
+  const titulo = pathname === '/' ? 'Inicio' : pathname.startsWith('/cuenta') ? 'Mi cuenta' : pathname.startsWith('/admin/usuarios') ? 'Usuarios' : pathname.startsWith('/admin/respaldo') ? 'Estado del respaldo' : pathname.startsWith('/m01/reportes') ? 'Reportes' : modulo?.nombre ?? 'Prodmazul';
   const esAdmin = perfil?.es_admin_general === true;
   const nombre = perfil?.nombre?.trim() || perfil?.correo || '';
   // Quienes administran (administrador general o permiso de configuración del módulo 1) ven el estado del respaldo.
@@ -94,6 +94,7 @@ export default function Layout() {
           <nav aria-label="Principal">
             <NavLink to="/" end><Icono nombre="inicio" tamano={22} />Inicio</NavLink>
             {modulos.map((m) => <NavLink key={m.modulo_id} to={m.ruta}><Icono nombre={iconoDeModulo(m.modulo_id)} tamano={22} />{m.nombre}</NavLink>)}
+            {puede('M01', 'ver_reportes') && <NavLink to="/m01/reportes"><Icono nombre="lista" tamano={22} />Reportes</NavLink>}
             {veRespaldo && <NavLink to="/admin/respaldo"><Icono nombre="nube" tamano={22} />Estado del respaldo</NavLink>}
             {esAdmin && <NavLink to="/admin/usuarios"><Icono nombre="usuarios" tamano={22} />Usuarios</NavLink>}
             {esAdmin && <NavLink to="/cuenta/clave"><Icono nombre="candado" tamano={22} />Cambiar mi contraseña</NavLink>}
