@@ -290,3 +290,39 @@ select correo, nombre,
 from core.perfiles p
 where not activo
 order by lower(nombre);
+
+-- 55) Auditoría «a mano»: cuántos eventos hay por acción. Compara con la pantalla Auditoría (filtro «Acción»)
+select accion, count(*) as eventos, max(creado_en at time zone 'America/Guayaquil') as ultimo_ecuador
+from core.auditoria
+group by accion
+order by eventos desc, accion;
+
+-- 56) Configuración actual (los 8 parámetros de la pantalla Configuración). Solo lee
+select clave, valor
+from core.config
+where clave in ('dias_retencion_fotos','purga_gracia_horas','purga_max_por_corrida','factor_lb_kg','max_fotos_recepcion','formato_lote','sync_alerta_horas','sync_dias_historial')
+order by clave;
+
+-- 57) Lotes cerrados y abiertos «a mano». Compara con la pantalla Lotes (Cerrados / Abiertos)
+select count(*) filter (where cerrado) as cerrados, count(*) filter (where not cerrado) as abiertos
+from core.lotes;
+
+-- 58) Nombres de prueba del catálogo (Parte 10): recepciones y lotes de cada uno. Solo lee
+select 'proveedor' as tipo, p.nombre,
+       (select count(*) from m01_recepcion.recepciones r where r.proveedor_id = p.id and r.estado <> 'eliminado') as recepciones,
+       (select count(*) from core.lotes l where l.proveedor_id = p.id) as lotes
+from core.proveedores p where p.nombre ilike 'ZZ Prueba P10%'
+union all
+select 'especie', e.nombre,
+       (select count(*) from m01_recepcion.recepciones r where r.especie_id = e.id and r.estado <> 'eliminado'),
+       (select count(*) from core.lotes l where l.especie_id = e.id)
+from core.especies e where e.nombre ilike 'ZZ Prueba P10%'
+order by 1, 2;
+
+-- 59) Alias creados al unir nombres (el nombre viejo apunta al nombre que se conservó). Solo lee
+select a.tipo, a.nombre as nombre_viejo, a.unido_en at time zone 'America/Guayaquil' as unido_ecuador,
+       coalesce(p.nombre, e.nombre) as se_conserva
+from core.catalogo_alias a
+left join core.proveedores p on a.tipo = 'proveedor' and p.id = a.destino_id
+left join core.especies e on a.tipo = 'especie' and e.id = a.destino_id
+order by a.unido_en desc;

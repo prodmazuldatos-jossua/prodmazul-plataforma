@@ -427,3 +427,18 @@ h1 > .icono { color: var(--azul-oscuro); margin-right: .45rem; vertical-align: -
 .lista-historial { list-style: none; margin: .5rem 0 1rem; padding: 0; }
 .lista-historial li { padding: .55rem 0; border-top: 1px solid var(--linea); overflow-wrap: anywhere; }
 .lista-historial li:first-child { border-top: 0; }
+
+/* ---- Fase 5 · Parte 10: administración (configuración, auditoría, lotes, catálogo) ---- */
+.parametro .campo { margin-bottom: .5rem; }
+.parametro code { background: #eef4f7; padding: .1rem .4rem; border-radius: 6px; word-break: break-all; }
+.filtros-auditoria { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: .5rem 1rem; align-items: end; }
+.filtros-auditoria .campo-busqueda { grid-column: 1 / -1; }
+.acciones-filtro { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.tabla-auditoria td { vertical-align: top; }
+.tabla-auditoria details { margin-top: .25rem; }
+.detalle-json { margin: .4rem 0 0; padding: .5rem .7rem; background: #eef4f7; border-radius: 8px; font-size: .8rem; max-width: 26rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+.paginacion { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; }
+.tabla-reporte .num { text-align: right; font-variant-numeric: tabular-nums; }
+.etiqueta-parecido { margin-left: .5rem; background: #fff3cd; color: #6b5200; border: 1px solid #e6c860; border-radius: 999px; padding: .05rem .55rem; font-size: .75rem; font-weight: 700; }
+.fila-parecida { background: #fffdf4; }
+.tabla-scroll { position: relative; } /* contiene los textos ocultos de las cabeceras */

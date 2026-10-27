@@ -1,19 +1,15 @@
-Fase 5 - Parte 9: Administracion de usuarios y roles
+Fase 5 - Parte 10: Configuracion, auditoria, reabrir lotes y catalogo
 Archivos nuevos:
-  supabase/migrations/20261020000019_usuarios_auditoria.sql   (migracion 19: auditoria con antes/despues y historial de usuarios)
-  supabase/functions/admin-usuarios/nucleo.ts                  (logica de la funcion de servidor, version 2)
-  docs/prueba_parte9_f5.sql          (prueba que se pega en el SQL Editor de Supabase; no deja datos)
-  tests/sql/fase5_parte9.mjs         (prueba automatica de la base, opcional)
-  tests/usuarios/                    (pruebas de la funcion admin-usuarios, opcional)
-  tests/seguridad/                   (pruebas del verificador de seguridad, opcional)
-  tests/exportador/exportador.test.mjs   (corregido: la prueba usaba la fecha UTC y fallaba por la noche en Ecuador)
-  herramientas/verificar-seguridad.mjs   (busca claves expuestas en Git y en la aplicacion compilada)
-  web/src/core/admin/usuarios.ts, usuarios.test.ts
+  supabase/migrations/20261020000020_config_auditoria_lotes_catalogo.sql   (migracion 20)
+  docs/prueba_parte10_f5.sql         (prueba que se pega en el SQL Editor de Supabase; no deja datos)
+  tests/sql/fase5_parte10.mjs        (prueba automatica de la base, opcional)
+  web/src/core/administracion/       (api.ts, administracion.ts, administracion.test.ts y las 4 pantallas:
+                                      PaginaConfiguracion, PaginaAuditoria, PaginaLotes, PaginaCatalogo)
 Archivos actualizados (se reemplazan por las versiones nuevas):
-  supabase/functions/admin-usuarios/index.ts   (version 2: hay que volver a desplegarla)
-  docs/consultas_exportador.sql                (consultas nuevas: 50 a 54)
-  web/src/core/admin/api.ts, PaginaUsuarios.tsx, web/src/styles.css
-Esta parte NO cambia el receptor de Google ni sync-exportar.
-SI cambia la base (migracion 19), la funcion admin-usuarios (hay que desplegarla de nuevo) y la aplicacion web (probar, compilar y publicar).
-Las contrasenas nunca se guardan en la base ni en la auditoria, y nunca se escriben en el registro de la funcion.
+  docs/consultas_exportador.sql      (consultas nuevas: 55 a 59)
+  web/src/App.tsx, web/src/core/Layout.tsx, web/src/styles.css
+Esta parte NO cambia el receptor de Google, ni sync-exportar, ni admin-usuarios.
+SI cambia la base (migracion 20) y la aplicacion web (probar, compilar y publicar).
+La migracion reemplaza "reabrir lote": ahora pide un motivo (la version sin motivo desaparece).
+La migracion no borra ni modifica recepciones, lotes ni catalogos existentes.
 Secretos: no hay ninguno en esta parte.
