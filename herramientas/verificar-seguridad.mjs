@@ -22,9 +22,20 @@ export function decodificarJwt(t) {
   } catch { return null; }
 }
 
+/** ¿Son la misma carpeta? Se compara por identidad en el disco, no por texto (en Windows una misma carpeta puede escribirse de varias formas: nombres cortos 8.3, mayúsculas, enlaces). */
+function mismaCarpeta(a, b) {
+  try {
+    const x = fs.statSync(a, { bigint: true }); const y = fs.statSync(b, { bigint: true });
+    return x.dev === y.dev && x.ino === y.ino && x.ino !== 0n;
+  } catch { return false; }
+}
 function listarGit(raiz) {
   try {
-    const out = execFileSync('git', ['ls-files', '-z'], { cwd: raiz, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
+    const opc = { cwd: raiz, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 };
+    // Solo se usa Git si la carpeta revisada ES la raíz del repositorio (si está dentro de otro repositorio, se revisa la carpeta completa).
+    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], opc).toString('utf8').trim();
+    if (!mismaCarpeta(top, raiz) && path.resolve(top).toLowerCase() !== path.resolve(raiz).toLowerCase()) return null;
+    const out = execFileSync('git', ['ls-files', '-z'], opc).toString('utf8');
     return out.split('\0').filter(Boolean);
   } catch { return null; }
 }

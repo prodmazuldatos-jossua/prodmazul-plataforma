@@ -11,8 +11,10 @@ const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const jwt = (role) => `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ iss: 'supabase', role, exp: 4102444800 })}.${'f'.repeat(30)}`;
 const SERVICIO = jwt('service_role'); const ANON = jwt('anon');
 
+// Carpeta de trabajo propia, para que la prueba no dependa de si la carpeta temporal del sistema está dentro de otro repositorio.
+const PADRE = fs.mkdtempSync(path.join(os.tmpdir(), 'segpadre-'));
 function proyecto(archivos, { git = true } = {}) {
-  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'seg-'));
+  const d = fs.mkdtempSync(path.join(PADRE, 'seg-'));
   const base = {
     '.gitignore': '.env.local\nnode_modules\ndist\nbackups\n',
     'apps/web/src/main.tsx': 'const url = import.meta.env.VITE_SUPABASE_URL;\n',
@@ -22,7 +24,7 @@ function proyecto(archivos, { git = true } = {}) {
     if (c === null) continue;
     fs.mkdirSync(path.dirname(path.join(d, f)), { recursive: true }); fs.writeFileSync(path.join(d, f), c);
   }
-  if (git) { execFileSync('git', ['init', '-q'], { cwd: d }); execFileSync('git', ['add', '-A', '-f'], { cwd: d }); }
+  if (git) { const o = { cwd: d, stdio: 'ignore' }; execFileSync('git', ['init', '-q'], o); execFileSync('git', ['-c', 'core.safecrlf=false', 'add', '-A', '-f'], o); }
   return d;
 }
 const criticos = (r) => r.hallazgos.filter((h) => h.nivel === 'CRITICO');
@@ -68,7 +70,19 @@ t('contraseña larga escrita en el código: aviso', r.hallazgos.some((h) => h.ni
 r = verificar(proyecto({ '.gitignore': 'x' }));
 t('.gitignore incompleto: aviso', r.hallazgos.filter((h) => h.nivel === 'AVISO').length >= 3);
 
+console.log('\nLa misma carpeta escrita de otra forma (enlace)');
+{
+  const d = proyecto({ '.env.local': 'X=1' });
+  const enlace = path.join(PADRE, 'enlace-' + path.basename(d));
+  let creado = true; try { fs.symlinkSync(d, enlace, 'junction'); } catch { creado = false; }
+  if (creado) { r = verificar(enlace); t('revisa con Git aunque la ruta sea otra forma de la misma carpeta', r.usaGit === true && criticos(r).some((h) => h.archivo === '.env.local'), JSON.stringify(r.hallazgos)); }
+  else console.log('  (no se pudo crear el enlace en este equipo; prueba omitida)');
+}
+
 console.log('\nSin Git');
+{ // aunque la carpeta esté DENTRO de otro repositorio, se revisa completa
+  execFileSync('git', ['init', '-q'], { cwd: PADRE, stdio: 'ignore' });
+}
 r = verificar(proyecto({ 'apps/web/src/api.ts': `const k = "${SERVICIO}";` }, { git: false }));
 t('sin Git también revisa la carpeta', r.usaGit === false && criticos(r).length >= 1);
 
