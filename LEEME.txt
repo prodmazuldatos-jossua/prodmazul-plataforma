@@ -1,12 +1,10 @@
-Fase 5 - Parte 6: Estado de la sincronizacion y aviso de 6 horas
+Fase 5 - Parte 7: Reportes (base de datos)
 Archivos nuevos:
-  supabase/migrations/20261020000017_respaldo_indicador.sql   (migracion 17: api_respaldo_resumen y api_respaldo_errores; solo lectura)
-  docs/prueba_parte6_f5.sql          (prueba que se pega en el SQL Editor de Supabase; no deja datos)
-  tests/sql/fase5_parte6.mjs         (prueba automatica de la base, opcional)
-  web/src/core/respaldo/             (indicador «Respaldo: hace X minutos», aviso rojo y pantalla «Estado del respaldo» + pruebas)
+  supabase/migrations/20261020000018_reportes_base.sql   (migracion 18: 3 funciones de reportes, solo lectura, y un indice)
+  docs/prueba_parte7_f5.sql          (prueba que se pega en el SQL Editor de Supabase; no deja datos)
+  tests/sql/fase5_parte7.mjs         (prueba automatica de la base, opcional)
 Archivos actualizados:
-  web/src/core/Layout.tsx, web/src/App.tsx, web/src/styles.css   (se reemplazan por las versiones nuevas)
-  docs/consultas_exportador.sql      (consultas nuevas: 37 a 39)
-Esta parte NO cambia el receptor de Google ni la funcion sync-exportar: no hay que volver a publicarlos.
-Solo la ven quienes administran (administrador general o permiso admin_config del modulo 1). No se envian correos.
-Esta parte SI cambia la aplicacion web: hay que probar, compilar y publicar (los archivos van en apps\web\src).
+  docs/consultas_exportador.sql      (consultas nuevas: 40 a 49, reportes y su comparacion «a mano»)
+Esta parte NO cambia la aplicacion web, ni el receptor de Google, ni la funcion sync-exportar: solo la base de datos.
+Los reportes se muestran en pantalla en la Parte 8. Reglas: libras planta; la semana empieza el lunes; no cuentan las
+recepciones anuladas ni eliminadas (ni los borradores, salvo que se pida); un lote cuenta una vez por periodo.

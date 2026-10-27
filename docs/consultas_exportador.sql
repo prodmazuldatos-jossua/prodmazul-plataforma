@@ -184,3 +184,76 @@ from core.sync_estado e where e.id = 1;
 
 -- 39) MODIFICA: pedir una sincronización ahora; al terminar bien, el reloj vuelve a cero y el aviso rojo desaparece
 -- select core.sync_disparar('manual');
+
+-- =====================================================================================================================
+-- REPORTES (Parte 7). Solo lectura.
+-- Las funciones de reportes revisan el permiso de quien las llama y el SQL Editor no tiene sesión de usuario. Por eso cada
+-- consulta de reporte (41, 43, 45, 46 y 48) ya trae, dentro de la MISMA instrucción, el paso que «presenta» al administrador
+-- general (set_config). Se copian y se ejecutan TAL CUAL, enteras y con un solo Run: no hace falta ejecutar nada antes.
+-- «Hoy» se calcula con la hora de Ecuador (Supabase trabaja en hora UTC y, de noche, su «hoy» ya sería mañana).
+-- Las consultas «A MANO» (42, 44, 47 y 49) no usan las funciones y no necesitan presentación.
+-- =====================================================================================================================
+
+-- 41) Reporte por MES de este año (función). Libras planta, lotes distintos y diferencia contra lo reportado.
+select f.*
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_m01_rep_periodos(date_trunc('year', now() at time zone 'America/Guayaquil')::date, (now() at time zone 'America/Guayaquil')::date, 'mes') as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'filas') as f(inicio date, fin date, parcial boolean, recepciones int, lotes int, libras_planta numeric, libras_reportadas numeric, diferencia_lb numeric, diferencia_pct numeric);
+
+-- 42) LO MISMO «A MANO» (sin usar la función): debe dar los mismos números que la consulta 41 en los meses con recepciones
+select date_trunc('month', fecha_llegada::timestamp)::date as inicio, count(*) as recepciones, count(distinct lote_id) as lotes,
+       sum(libras_planta) as libras_planta, sum(libras_reportadas) as libras_reportadas
+from m01_recepcion.recepciones
+where estado = 'cerrado' and fecha_llegada between date_trunc('year', now() at time zone 'America/Guayaquil')::date and (now() at time zone 'America/Guayaquil')::date
+group by 1 order by 1;
+
+-- 43) Reporte por SEMANA (lunes a domingo) de los últimos 60 días (función)
+select f.*
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_m01_rep_periodos((now() at time zone 'America/Guayaquil')::date - 59, (now() at time zone 'America/Guayaquil')::date, 'semana') as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'filas') as f(inicio date, fin date, parcial boolean, recepciones int, lotes int, libras_planta numeric, libras_reportadas numeric, diferencia_lb numeric, diferencia_pct numeric);
+
+-- 44) LO MISMO «A MANO» por semana (la semana empieza el lunes)
+select date_trunc('week', fecha_llegada::timestamp)::date as lunes, count(*) as recepciones, count(distinct lote_id) as lotes, sum(libras_planta) as libras_planta
+from m01_recepcion.recepciones
+where estado = 'cerrado' and fecha_llegada between (now() at time zone 'America/Guayaquil')::date - 59 and (now() at time zone 'America/Guayaquil')::date
+group by 1 order by 1;
+
+-- 45) Reporte por DÍA de los últimos 14 días (función)
+select f.*
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_m01_rep_periodos((now() at time zone 'America/Guayaquil')::date - 13, (now() at time zone 'America/Guayaquil')::date, 'dia') as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'filas') as f(inicio date, recepciones int, lotes int, libras_planta numeric, libras_reportadas numeric);
+
+-- 46) Proveedores del año (función): primero el total de proveedores y los totales; luego la lista con libras por proveedor
+select x.r->>'proveedores_con_recepcion' as proveedores_con_recepcion, x.r->>'proveedores_catalogo' as proveedores_en_catalogo, x.r->'totales' as totales
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_m01_rep_proveedores(date_trunc('year', now() at time zone 'America/Guayaquil')::date, (now() at time zone 'America/Guayaquil')::date) as r where s.c is not null) x
+;
+select f.*
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_m01_rep_proveedores(date_trunc('year', now() at time zone 'America/Guayaquil')::date, (now() at time zone 'America/Guayaquil')::date) as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'filas') as f(proveedor text, recepciones int, lotes int, libras_planta numeric, libras_reportadas numeric, diferencia_lb numeric, porcentaje numeric);
+
+-- 47) LO MISMO «A MANO» por proveedor
+select p.nombre as proveedor, count(*) as recepciones, count(distinct r.lote_id) as lotes, sum(r.libras_planta) as libras_planta
+from m01_recepcion.recepciones r join core.proveedores p on p.id = r.proveedor_id
+where r.estado = 'cerrado' and r.fecha_llegada between date_trunc('year', now() at time zone 'America/Guayaquil')::date and (now() at time zone 'America/Guayaquil')::date
+group by p.nombre order by sum(r.libras_planta) desc;
+
+-- 48) Especie por proveedor del año (función): la lista y, después, el total por especie
+select f.*
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_m01_rep_especie_proveedor(date_trunc('year', now() at time zone 'America/Guayaquil')::date, (now() at time zone 'America/Guayaquil')::date) as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'filas') as f(proveedor text, especie text, recepciones int, lotes int, libras_planta numeric);
+
+select f.*
+from (select set_config('request.jwt.claim.sub', (select user_id::text from core.perfiles where es_admin_general and activo order by creado_en limit 1), false) as c) s
+cross join lateral (select public.api_m01_rep_especie_proveedor(date_trunc('year', now() at time zone 'America/Guayaquil')::date, (now() at time zone 'America/Guayaquil')::date) as r where s.c is not null) x
+cross join lateral jsonb_to_recordset(x.r->'por_especie') as f(especie text, recepciones int, lotes int, proveedores int, libras_planta numeric);
+
+-- 49) Cuántas recepciones NO cuentan en los reportes y por qué (anuladas, eliminadas y borradores del año)
+select estado, count(*) as recepciones, sum(libras_planta) as libras_planta
+from m01_recepcion.recepciones
+where fecha_llegada between date_trunc('year', now() at time zone 'America/Guayaquil')::date and (now() at time zone 'America/Guayaquil')::date
+group by estado order by estado;
