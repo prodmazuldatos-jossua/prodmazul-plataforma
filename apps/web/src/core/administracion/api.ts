@@ -53,6 +53,8 @@ export type TipoCatalogo = 'proveedores' | 'especies';
 export interface ItemCatalogo {
   id: string; nombre: string; activo: boolean; recepciones: number; lotes: number;
   ultima_recepcion: string | null; parecidos: number; grupo: string | null;
+  /** true si tiene alguna recepción (de cualquier estado) o algún lote: no se puede eliminar. */
+  en_uso?: boolean;
 }
 export interface Catalogo { tipo: TipoCatalogo; total: number; items: ItemCatalogo[] }
 export async function listarCatalogo(p: { tipo: TipoCatalogo; busqueda: string; solo_parecidos: boolean }): Promise<Catalogo> {
@@ -60,11 +62,18 @@ export async function listarCatalogo(p: { tipo: TipoCatalogo; busqueda: string; 
   if (error) throw aApiError(error);
   return data as Catalogo;
 }
-export interface ResultadoUnion { destino_nombre: string; origen_nombre: string; recepciones: number; lotes: number }
-export async function unirCatalogo(tipo: TipoCatalogo, origen: string, destino: string, motivo: string): Promise<ResultadoUnion> {
-  const { data, error } = await supabase.rpc('api_admin_catalogo_unir', { p_tipo: tipo, p_origen: origen, p_destino: destino, p_motivo: motivo });
+export interface ResultadoRenombrar { id: string; nombre: string; antes?: string; sin_cambios?: boolean }
+/** Cambia el nombre de un proveedor o una especie. Las recepciones y los lotes lo muestran con el nombre nuevo. */
+export async function renombrarCatalogo(tipo: TipoCatalogo, id: string, nombre: string): Promise<ResultadoRenombrar> {
+  const { data, error } = await supabase.rpc('api_admin_catalogo_renombrar', { p_tipo: tipo, p_id: id, p_nombre: nombre });
   if (error) throw aApiError(error);
-  return data as ResultadoUnion;
+  return data as ResultadoRenombrar;
+}
+/** Elimina un proveedor o una especie que no está en ninguna recepción. */
+export async function eliminarCatalogo(tipo: TipoCatalogo, id: string): Promise<{ id: string; nombre: string }> {
+  const { data, error } = await supabase.rpc('api_admin_catalogo_eliminar', { p_tipo: tipo, p_id: id });
+  if (error) throw aApiError(error);
+  return data as { id: string; nombre: string };
 }
 
 export interface ResultadoCrearCatalogo { id: string; nombre: string; tipo: TipoCatalogo }

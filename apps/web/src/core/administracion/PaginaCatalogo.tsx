@@ -1,47 +1,65 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alerta, Cargando, Modal, Vacio } from '../ui';
-import { Icono } from '../iconos';
 import { mensajeDe } from '../../lib/errores';
 import { formatoFecha } from '../../lib/fechas';
-import { crearCatalogo, listarCatalogo, unirCatalogo, type Catalogo, type ItemCatalogo, type TipoCatalogo } from './api';
-import { MOTIVO_MAXIMO, NOMBRE_CATALOGO_MAXIMO, errorMotivo, errorNombreCatalogo, gruposParecidos, textoUnion } from './administracion';
+import { crearCatalogo, eliminarCatalogo, listarCatalogo, renombrarCatalogo, type Catalogo, type ItemCatalogo, type TipoCatalogo } from './api';
+import { NOMBRE_CATALOGO_MAXIMO, errorNombreCatalogo, gruposParecidos } from './administracion';
 import { parecidos } from '../../lib/texto';
 
 const TIPOS: { id: TipoCatalogo; texto: string }[] = [{ id: 'proveedores', texto: 'Proveedores' }, { id: 'especies', texto: 'Especies' }];
 
-function VentanaUnir({ tipo, origen, todos, onCerrar, onListo }: { tipo: TipoCatalogo; origen: ItemCatalogo; todos: ItemCatalogo[]; onCerrar: () => void; onListo: (t: string) => void }) {
-  const opciones = todos.filter((i) => i.id !== origen.id);
-  const sugerido = opciones.find((i) => origen.grupo && i.grupo === origen.grupo)?.id ?? '';
-  const [destino, setDestino] = useState(sugerido);
-  const [motivo, setMotivo] = useState('');
+function VentanaEditar({ tipo, item, existentes, onCerrar, onListo }: { tipo: TipoCatalogo; item: ItemCatalogo; existentes: string[]; onCerrar: () => void; onListo: (t: string) => void }) {
+  const [nombre, setNombre] = useState(item.nombre);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const elegido = opciones.find((i) => i.id === destino);
+  const singular = tipo === 'proveedores' ? 'proveedor' : 'especie';
+  const entrada = useRef<HTMLInputElement>(null);
+  useEffect(() => { const t = setTimeout(() => { entrada.current?.focus(); entrada.current?.select(); }, 0); return () => clearTimeout(t); }, []);
+  const otros = existentes.filter((n) => n !== item.nombre);
   const enviar = async () => {
-    if (!elegido) { setError('Elige el nombre que se conserva.'); return; }
-    const e = errorMotivo(motivo);
+    if (nombre.trim() === item.nombre) { onCerrar(); return; }
+    const e = errorNombreCatalogo(nombre, otros, tipo);
     if (e) { setError(e); return; }
     setGuardando(true); setError(null);
     try {
-      const r = await unirCatalogo(tipo, origen.id, elegido.id, motivo.trim());
-      onListo(`Se unió «${r.origen_nombre}» a «${r.destino_nombre}»: ${r.recepciones} recepción(es) y ${r.lotes} lote(s) pasaron al nombre conservado.`);
+      const r = await renombrarCatalogo(tipo, item.id, nombre.trim());
+      onListo(`Se cambió «${item.nombre}» por «${r.nombre}». Las recepciones ya lo muestran con el nombre nuevo.`);
     } catch (x) { setError(mensajeDe(x)); setGuardando(false); }
   };
   return (
-    <Modal titulo={`Unir «${origen.nombre}»`} onCerrar={() => { if (!guardando) onCerrar(); }}
+    <Modal titulo={`Editar ${singular}`} onCerrar={() => { if (!guardando) onCerrar(); }}
            acciones={<>
              <button type="button" className="boton-secundario" disabled={guardando} onClick={onCerrar}>Cancelar</button>
-             <button type="button" className="boton-peligro" disabled={guardando} onClick={() => void enviar()}>{guardando ? 'Uniendo…' : 'Unir nombres'}</button>
+             <button type="button" className="boton-primario" data-testid="guardar-nombre" disabled={guardando} onClick={() => void enviar()}>{guardando ? 'Guardando…' : 'Guardar'}</button>
            </>}>
       {error && <Alerta tipo="error">{error}</Alerta>}
-      <div className="campo"><label htmlFor="u-destino">Nombre que se conserva</label>
-        <select id="u-destino" value={destino} onChange={(e) => setDestino(e.target.value)}>
-          <option value="">Elige uno…</option>
-          {opciones.map((i) => <option key={i.id} value={i.id}>{i.nombre} ({i.recepciones} recepciones)</option>)}
-        </select></div>
-      {elegido && <Alerta tipo="aviso"><span data-testid="texto-union">{textoUnion(tipo, origen, elegido)}</span></Alerta>}
-      <div className="campo"><label htmlFor="u-motivo">Motivo</label>
-        <textarea id="u-motivo" value={motivo} maxLength={MOTIVO_MAXIMO} onChange={(e) => setMotivo(e.target.value)} /></div>
+      <div className="campo"><label htmlFor="e-nombre">Nombre del {singular}</label>
+        <input id="e-nombre" type="text" value={nombre} maxLength={NOMBRE_CATALOGO_MAXIMO} autoComplete="off" ref={entrada}
+               onChange={(e) => { setNombre(e.target.value); setError(null); }}
+               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void enviar(); } }} />
+        <p className="ayuda">El cambio se aplica a todas las recepciones y lotes que ya usan este nombre.</p></div>
+    </Modal>
+  );
+}
+
+function VentanaEliminar({ tipo, item, onCerrar, onListo }: { tipo: TipoCatalogo; item: ItemCatalogo; onCerrar: () => void; onListo: (t: string) => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const enviar = async () => {
+    setGuardando(true); setError(null);
+    try {
+      await eliminarCatalogo(tipo, item.id);
+      onListo(`Se eliminó ${tipo === 'proveedores' ? 'el proveedor' : 'la especie'} «${item.nombre}».`);
+    } catch (x) { setError(mensajeDe(x)); setGuardando(false); }
+  };
+  return (
+    <Modal titulo={`Eliminar «${item.nombre}»`} onCerrar={() => { if (!guardando) onCerrar(); }}
+           acciones={<>
+             <button type="button" className="boton-secundario" disabled={guardando} onClick={onCerrar}>Cancelar</button>
+             <button type="button" className="boton-peligro" data-testid="confirmar-eliminar" disabled={guardando} onClick={() => void enviar()}>{guardando ? 'Eliminando…' : 'Eliminar'}</button>
+           </>}>
+      {error && <Alerta tipo="error">{error}</Alerta>}
+      <p>¿Eliminar {tipo === 'proveedores' ? 'el proveedor' : 'la especie'} <strong>{item.nombre}</strong>? No está en ninguna recepción. Esta acción no se puede deshacer.</p>
     </Modal>
   );
 }
@@ -92,7 +110,8 @@ export default function PaginaCatalogo() {
   const [todos, setTodos] = useState<ItemCatalogo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
-  const [origen, setOrigen] = useState<ItemCatalogo | null>(null);
+  const [editando, setEditando] = useState<ItemCatalogo | null>(null);
+  const [eliminando, setEliminando] = useState<ItemCatalogo | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [creando, setCreando] = useState(false);
 
@@ -114,7 +133,7 @@ export default function PaginaCatalogo() {
   return (
     <div>
       <div className="encabezado-lista"><h1>Catálogo</h1></div>
-      <p className="texto-suave">Revisa los proveedores y las especies, o crea uno nuevo. Si un mismo nombre quedó escrito de dos maneras, únelos: todo pasa al nombre que conserves.</p>
+      <p className="texto-suave">Crea, corrige el nombre o elimina proveedores y especies. Solo se puede eliminar lo que no está en ninguna recepción.</p>
       <div className="acciones-fila">
         <button type="button" className="boton-primario" data-testid="boton-nuevo-catalogo" onClick={() => { setAviso(null); setCreando(true); }}>
           + {tipo === 'proveedores' ? 'Nuevo proveedor' : 'Nueva especie'}
@@ -152,7 +171,12 @@ export default function PaginaCatalogo() {
                       <td><strong>{i.nombre}</strong>{i.grupo && <span className="etiqueta-parecido">Parecido</span>}{!i.activo && <span className="texto-suave"> · inactivo</span>}</td>
                       <td className="num">{i.recepciones}</td><td className="num">{i.lotes}</td>
                       <td>{i.ultima_recepcion ? formatoFecha(i.ultima_recepcion) : '—'}</td>
-                      <td><button type="button" className="boton-mini" onClick={() => { setAviso(null); setOrigen(i); }} aria-label={`Unir ${i.nombre} a otro nombre`}><Icono nombre="lista" />Unir…</button></td>
+                      <td className="acciones-celda">
+                        <button type="button" className="boton-secundario boton-mini" data-testid="editar-catalogo" onClick={() => { setAviso(null); setEditando(i); }} aria-label={`Editar el nombre de ${i.nombre}`}>Editar</button>{' '}
+                        <button type="button" className="boton-peligro boton-mini" data-testid="eliminar-catalogo" disabled={Boolean(i.en_uso)}
+                                title={i.en_uso ? 'No se puede eliminar: está en una o más recepciones.' : undefined}
+                                onClick={() => { setAviso(null); setEliminando(i); }} aria-label={i.en_uso ? `${i.nombre} está en recepciones y no se puede eliminar` : `Eliminar ${i.nombre}`}>Eliminar</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -162,7 +186,8 @@ export default function PaginaCatalogo() {
         </>
       )}
       {creando && <VentanaNuevo tipo={tipo} existentes={todos.map((i) => i.nombre)} onCerrar={() => setCreando(false)} onListo={(t) => { setCreando(false); setAviso(t); setTexto(''); setBusqueda(''); setSolo(false); void cargar(); }} />}
-      {origen && <VentanaUnir tipo={tipo} origen={origen} todos={todos} onCerrar={() => setOrigen(null)} onListo={(t) => { setOrigen(null); setAviso(t); void cargar(); }} />}
+      {editando && <VentanaEditar tipo={tipo} item={editando} existentes={todos.map((i) => i.nombre)} onCerrar={() => setEditando(null)} onListo={(t) => { setEditando(null); setAviso(t); void cargar(); }} />}
+      {eliminando && <VentanaEliminar tipo={tipo} item={eliminando} onCerrar={() => setEliminando(null)} onListo={(t) => { setEliminando(null); setAviso(t); void cargar(); }} />}
     </div>
   );
 }
