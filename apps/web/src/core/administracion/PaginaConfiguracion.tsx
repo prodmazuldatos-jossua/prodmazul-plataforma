@@ -59,7 +59,7 @@ export default function PaginaConfiguracion() {
   return (
     <div>
       <div className="encabezado-lista"><h1>Configuración</h1></div>
-      <p className="texto-suave">Cada cambio se valida antes de guardarse y queda en la auditoría con el valor anterior y el nuevo. Los interruptores del envío a Sheets y de la purga de fotos no están aquí: se activan con las guías.</p>
+      <p className="texto-suave">Cada cambio se valida antes de guardarse y queda en la auditoría con el valor anterior y el nuevo. Algunos interruptores del respaldo los activa el responsable técnico.</p>
       {aviso && <Alerta tipo={aviso.tipo}>{aviso.texto}</Alerta>}
       {error && <Alerta tipo="error">{error}</Alerta>}
       {!params && !error && <Cargando />}

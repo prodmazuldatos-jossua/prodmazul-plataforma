@@ -32,7 +32,7 @@ function TextoError({ texto }: { texto: string | null }) {
     <div className="error-respaldo">
       <p className="error-respaldo-titulo">{ex.titulo}</p>
       <p className="error-respaldo-ayuda">{ex.ayuda}</p>
-      {texto && <details><summary>Ver el texto técnico</summary><p className="error-respaldo-tecnico">{texto}</p></details>}
+      {texto && <details><summary>Ver más detalle</summary><p className="error-respaldo-tecnico">{texto}</p></details>}
     </div>
   );
 }
@@ -90,7 +90,7 @@ export default function PaginaRespaldo() {
   return (
     <>
       <h1>Estado del respaldo</h1>
-      <p className="texto-suave">Cómo va la copia de los datos a Google Sheets y de las fotos a Drive. Los datos principales siempre están en Supabase.</p>
+      <p className="texto-suave">Cómo va la copia de los datos a Google Sheets y de las fotos a Drive. Los datos principales siempre están seguros en el sistema.</p>
 
       {error && <Alerta tipo="aviso">No se pudo actualizar ahora ({error}). Se muestra el último dato conocido.</Alerta>}
       {mensaje && <Alerta tipo={mensaje.tipo}>{mensaje.texto}</Alerta>}
@@ -102,7 +102,7 @@ export default function PaginaRespaldo() {
             <h2>{nivel ? TITULO_NIVEL[nivel] : ''}</h2>
             <p>
               {!resumen.activa
-                ? 'La sincronización automática no está programada (se enciende en la Parte 3 de la Fase 5).'
+                ? 'La sincronización automática está desactivada.'
                 : seg == null
                   ? 'Todavía no hay ninguna sincronización correcta.'
                   : <>Última sincronización correcta: <strong>{textoHace(seg)}</strong> ({formatoFechaHora(resumen.ultima_sync_ok_en)}).</>}

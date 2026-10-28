@@ -30,7 +30,7 @@ export default function PaginaLogin() {
         <img src="/logo.png" alt="Prodmazul S.A." className="logo-acceso" />
         <h1>Plataforma de Producción</h1>
         {!configuracionCompleta && (
-          <Alerta tipo="error">Falta configurar la conexión con Supabase (archivo .env.local o variables de Cloudflare). Revisa la guía de implementación.</Alerta>
+          <Alerta tipo="error">No se pudo conectar con el sistema. Intenta más tarde o avisa al administrador.</Alerta>
         )}
         {session && perfil && !perfil.activo && !cargando && (
           <Alerta tipo="error">

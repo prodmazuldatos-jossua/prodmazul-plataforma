@@ -3,8 +3,8 @@ import { Alerta, Cargando, Modal, Vacio } from '../ui';
 import { Icono } from '../iconos';
 import { mensajeDe } from '../../lib/errores';
 import { formatoFechaHora } from '../../lib/fechas';
-import { actualizarUsuario, cambiarClaveUsuario, crearUsuario, generarClave, listarHistorial, listarUsuarios, versionFuncionUsuarios, type EventoUsuario, type ListaUsuarios, type UsuarioAdmin } from './api';
-import { CLAVE_MAXIMA, CLAVE_MINIMA, SEGUNDOS_CLAVE_VISIBLE, errorClave, textoEvento, textoVersionFuncion } from './usuarios';
+import { actualizarUsuario, cambiarClaveUsuario, crearUsuario, generarClave, listarHistorial, listarUsuarios, type EventoUsuario, type ListaUsuarios, type UsuarioAdmin } from './api';
+import { CLAVE_MAXIMA, CLAVE_MINIMA, SEGUNDOS_CLAVE_VISIBLE, errorClave, textoEvento } from './usuarios';
 
 type Ventana = { tipo: 'crear' } | { tipo: 'editar'; u: UsuarioAdmin } | { tipo: 'clave'; u: UsuarioAdmin } | { tipo: 'estado'; u: UsuarioAdmin } | null;
 type Aviso = { tipo: 'exito' | 'aviso' | 'error'; texto: string; clave?: string };
@@ -35,7 +35,6 @@ export default function PaginaUsuarios() {
   const [error, setError] = useState<string | null>(null);
   const [ventana, setVentana] = useState<Ventana>(null);
   const [aviso, setAviso] = useState<Aviso | null>(null);
-  const [comprobando, setComprobando] = useState(false);
 
   // Una contraseña temporal no se queda a la vista: desaparece sola a los 2 minutos.
   useEffect(() => {
@@ -43,12 +42,6 @@ export default function PaginaUsuarios() {
     const id = setTimeout(() => setAviso(null), SEGUNDOS_CLAVE_VISIBLE * 1000);
     return () => clearTimeout(id);
   }, [aviso]);
-  const comprobarFuncion = async () => {
-    setComprobando(true); setAviso(null);
-    try { setAviso(textoVersionFuncion(await versionFuncionUsuarios())); }
-    catch (e) { setAviso(textoVersionFuncion(null, (e as Error).message)); }
-    finally { setComprobando(false); }
-  };
 
   const cargar = useCallback(async () => {
     setError(null);
@@ -67,7 +60,6 @@ export default function PaginaUsuarios() {
       <div className="encabezado-lista">
         <h1><Icono nombre="usuarios" tamano={28} />Usuarios</h1>
         <div className="acciones-fila acciones-detalle">
-          <button type="button" className="boton-secundario" data-testid="boton-comprobar-funcion" disabled={comprobando} onClick={() => void comprobarFuncion()}><Icono nombre="ok" />{comprobando ? 'Comprobando…' : 'Comprobar función'}</button>
           <button type="button" className="boton-primario" data-testid="boton-nuevo-usuario" onClick={() => { setAviso(null); setVentana({ tipo: 'crear' }); }}><Icono nombre="mas" />Nuevo usuario</button>
         </div>
       </div>

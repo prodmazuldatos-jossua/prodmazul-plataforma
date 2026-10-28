@@ -23,3 +23,11 @@ describe('errores', () => {
     expect(mensajeDe({ message: 'relation "x" does not exist' })).toBe('Ocurrió un error inesperado. Intenta de nuevo.');
   });
 });
+
+describe('mensajes sin jerga técnica', () => {
+  it('oculta textos de infraestructura', () => {
+    expect(aApiError(new Error('E_ESTADO|La foto ya fue purgada de Supabase; su única copia está en Drive.')).message).not.toMatch(/supabase/i);
+    expect(aApiError(new Error('E_CONFIG|Falta el secreto «x» en Vault.')).message).not.toMatch(/vault|secreto/i);
+    expect(aApiError(new Error('E_VALIDACION|El peso es obligatorio.')).message).toBe('El peso es obligatorio.');
+  });
+});

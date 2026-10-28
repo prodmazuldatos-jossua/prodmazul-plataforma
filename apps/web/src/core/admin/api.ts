@@ -29,7 +29,7 @@ async function llamarFuncion(body: Record<string, unknown>): Promise<{ aviso?: s
   const { data, error } = await supabase.functions.invoke('admin-usuarios', { body });
   if (error) {
     const estado = (error as { context?: { status?: number } }).context?.status;
-    if (estado === 404) throw new Error('La función «admin-usuarios» todavía no está instalada en Supabase. Mira el manual, paso «Instalar la función de usuarios».');
+    if (estado === 404) throw new Error('Esta acción no está disponible por ahora. Intenta más tarde o avisa al responsable técnico.');
     if (/failed to fetch|network|load failed/i.test(error.message)) throw new Error('No hay conexión. Inténtalo cuando tengas señal.');
     throw new Error('No se pudo completar la acción. Inténtalo de nuevo.');
   }

@@ -29,7 +29,7 @@ export function AvisoRespaldo() {
     <div data-testid="aviso-respaldo">
       <Alerta tipo="error">
         <strong>El respaldo en Google no está al día.</strong>{' '}
-        {motivos.join(' ')} Tus datos están seguros en Supabase, pero la copia en Google está atrasada.{' '}
+        {motivos.join(' ')} Tus datos están seguros en el sistema, pero la copia en Google está atrasada.{' '}
         <Link to="/admin/respaldo">Ver qué pasa</Link>
       </Alerta>
     </div>

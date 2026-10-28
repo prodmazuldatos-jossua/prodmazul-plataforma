@@ -39,7 +39,7 @@ export function textoEvento(e: Pick<EventoUsuario, 'accion' | 'usuario' | 'usuar
 /** Qué dice el botón «Comprobar función» según lo que respondió el servidor. */
 export function textoVersionFuncion(version: string | null | undefined, error?: string): { tipo: 'exito' | 'aviso' | 'error'; texto: string } {
   if (error) {
-    if (/no reconocida/i.test(error)) return { tipo: 'aviso', texto: 'La función de usuarios instalada es una versión anterior (no sabe responder la versión). Instala la versión 2 siguiendo la guía de la Parte 9.' };
+    if (/no reconocida/i.test(error)) return { tipo: 'aviso', texto: 'La gestión de usuarios está desactualizada. Avisa al responsable técnico.' };
     return { tipo: 'error', texto: error };
   }
   if (!version) return { tipo: 'aviso', texto: 'La función respondió, pero no informó su versión.' };
