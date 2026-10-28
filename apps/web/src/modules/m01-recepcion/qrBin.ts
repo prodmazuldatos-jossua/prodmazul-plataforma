@@ -3,42 +3,43 @@ import { matrizQr } from './qr';
 /** Medidas de la imagen de cada bin (pedidas: 302 × 378 px). */
 export const ANCHO_IMG = 302;
 export const ALTO_IMG = 378;
-const ZONA_QR = 266; // el QR (sin contar el borde blanco) cabe en este cuadrado: ocupa casi todo el ancho
 
-export interface DatosBin {
-  lote: string; fecha: string; guia: string; librasPlanta: number | null; proveedor: string; especie: string;
+export interface DatosBin { lote: string; guia: string; proveedor: string; especie: string }
+
+/**
+ * Texto sin tildes ni símbolos raros, en una sola línea y con largo máximo. Así el QR queda corto y se lee igual
+ * en cualquier lector (los lectores viejos o de pistola no siempre entienden las tildes y la «ñ»).
+ */
+export function textoSeguroQr(t: string, max: number): string {
+  return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max).trim();
 }
 
-/** Fecha AAAA-MM-DD a DD/MM/AAAA (sin tocar zonas horarias). */
-export function fechaCorta(f: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : f;
-}
-
-export function textoLibras(n: number | null): string {
-  if (n === null || Number.isNaN(n)) return '';
-  return `${(Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2, useGrouping: false })} lb`;
-}
-
-/** Lo que se lee al escanear el QR: Lote, Fecha, Guía, Libras planta, Proveedor y Especie (una por línea). */
+/** Lo que se lee al escanear el QR de un bin: Lote, Proveedor, Especie y Guía (una por línea). */
 export function textoQrBin(d: DatosBin): string {
   return [
-    `Lote: ${d.lote.trim()}`,
-    `Fecha: ${fechaCorta(d.fecha)}`,
-    `Guía: ${d.guia.trim()}`,
-    `Libras planta: ${textoLibras(d.librasPlanta)}`,
-    `Proveedor: ${d.proveedor.trim()}`,
-    `Especie: ${d.especie.trim()}`,
+    `Lote: ${textoSeguroQr(d.lote, 20)}`,
+    `Proveedor: ${textoSeguroQr(d.proveedor, 50)}`,
+    `Especie: ${textoSeguroQr(d.especie, 30)}`,
+    `Guia: ${textoSeguroQr(d.guia, 30)}`,
   ].join('\n');
 }
 
+/** Espacio libre abajo de la imagen para el código de lote. */
+const ZONA_TEXTO = 56;
+/** Borde blanco mínimo alrededor del QR, en módulos (la norma pide 4: sin él algunos lectores no lo encuentran). */
+const BORDE_MODULOS = 4;
+
 export interface Geometria { lado: number; modulo: number; x: number; y: number; n: number }
 
-/** Posición del QR dentro de la imagen: módulos de tamaño entero (bordes nítidos), centrado en la parte de arriba. */
+/**
+ * Posición del QR dentro de la imagen. Los módulos miden un número entero de píxeles (bordes nítidos) y siempre
+ * queda un borde blanco de 4 módulos a cada lado; dentro de eso, el QR es lo más grande posible.
+ */
 export function geometriaQr(n: number): Geometria {
-  const modulo = Math.max(1, Math.floor(ZONA_QR / n));
+  const modulo = Math.max(1, Math.floor(ANCHO_IMG / (n + 2 * BORDE_MODULOS)));
   const lado = modulo * n;
-  return { lado, modulo, n, x: Math.floor((ANCHO_IMG - lado) / 2), y: 16 + Math.floor((ZONA_QR - lado) / 2) };
+  const disponible = ALTO_IMG - ZONA_TEXTO;
+  return { lado, modulo, n, x: Math.floor((ANCHO_IMG - lado) / 2), y: Math.max(BORDE_MODULOS * modulo, Math.floor((disponible - lado) / 2)) };
 }
 
 export function nombreArchivoBin(lote: string, numBin: string): string {

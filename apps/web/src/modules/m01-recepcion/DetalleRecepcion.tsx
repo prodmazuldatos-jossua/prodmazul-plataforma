@@ -222,7 +222,7 @@ export default function DetalleRecepcion() {
                   <tr key={a.num_bin}><td>{a.num_bin}</td><td>{a.sellos_recepcion || '—'}</td><td>{a.sellos_almacenamiento || '—'}</td>
                     <td className="num">{a.temperatura_c === null ? '—' : `${Number(a.temperatura_c).toFixed(1)} °C`}</td>
                     <td className="num">{a.libras_aprox === null ? '—' : peso(Number(a.libras_aprox))}</td>
-                    <td><BotonQrBin numBin={a.num_bin} datos={{ lote: r.lote_id, fecha: r.fecha_llegada, guia: r.guia_remision, librasPlanta: r.libras_planta === null ? null : Number(r.libras_planta), proveedor: r.proveedor_nombre, especie: r.especie_nombre }} /></td></tr>
+                    <td><BotonQrBin numBin={a.num_bin} datos={{ lote: r.lote_id, guia: r.guia_remision, proveedor: r.proveedor_nombre, especie: r.especie_nombre }} /></td></tr>
                 ))}</tbody>
               </table>
             </div>

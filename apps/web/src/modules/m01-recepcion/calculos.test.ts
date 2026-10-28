@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { promedioBloque, totalLibrasAprox, totalPesos, diferenciaLb, diferenciaPct, duracionMin, pesoPromedio, redondear, textoDuracion } from './calculos';
+import { promedioBloque, totalLibrasAprox, totalPesos, diferenciaLb, diferenciaPct, duracionMin, pesoPromedio, redondear, textoDuracion, gavetasVisibles } from './calculos';
 
 describe('redondear', () => {
   it('redondea a 2 decimales como la base de datos', () => {
@@ -80,5 +80,24 @@ describe('formatoTemp', () => {
   it('siempre un decimal, igual en bines y gavetas', () => {
     expect(formatoTemp(-3)).toContain('-3.0');
     expect(formatoTemp(2.46)).toContain('2.5');
+  });
+});
+
+describe('gavetasVisibles', () => {
+  const vacias = () => Array.from({ length: 30 }, () => null as number | null);
+  it('empieza con 2 gavetas', () => {
+    expect(gavetasVisibles({ gavetas: vacias(), temperaturas: [] })).toBe(2);
+  });
+  it('respeta las que se fueron agregando, hasta 30', () => {
+    expect(gavetasVisibles({ gavetas: vacias(), temperaturas: [], gavetas_visibles: 7 })).toBe(7);
+    expect(gavetasVisibles({ gavetas: vacias(), temperaturas: [], gavetas_visibles: 99 })).toBe(30);
+  });
+  it('muestra siempre las gavetas que tienen peso o temperatura', () => {
+    const g = vacias(); g[11] = 30;
+    expect(gavetasVisibles({ gavetas: g, temperaturas: [] })).toBe(12);
+    expect(gavetasVisibles({ gavetas: vacias(), temperaturas: [{ num_gaveta: 21 }, { num_gaveta: null }] })).toBe(21);
+  });
+  it('un formulario guardado antes de este cambio (sin el dato) también funciona', () => {
+    expect(gavetasVisibles({ gavetas: vacias(), temperaturas: [] })).toBe(2);
   });
 });

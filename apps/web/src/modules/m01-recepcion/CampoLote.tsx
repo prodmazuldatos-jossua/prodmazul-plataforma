@@ -13,10 +13,12 @@ interface Props {
   error?: string;
   /** El formulario recibe lo que se sabe del lote: info (existente o nuevo) o null si aún no hay un lote válido. */
   onInfo: (info: InfoLote | null) => void;
+  /** Lote que no se puede cambiar (al editar una recepción ya guardada). */
+  bloqueado?: boolean;
 }
 
 /** Campo de lote: valida el formato, consulta si existe y muestra camiones y libras acumulados. */
-export default function CampoLote({ value, onChange, formatoLote, error, onInfo }: Props) {
+export default function CampoLote({ value, onChange, formatoLote, error, onInfo, bloqueado }: Props) {
   const { texto: peso } = useUnidad();
   const [info, setInfo] = useState<InfoLote | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -46,9 +48,9 @@ export default function CampoLote({ value, onChange, formatoLote, error, onInfo 
 
   return (
     <Campo id="lote_id" etiqueta="Lote" obligatorio error={error}
-           ayuda="3 grupos separados por guion, por ejemplo 123-456-789 o 123-456A-789.">
+           ayuda={bloqueado ? 'El lote no se modifica al editar la recepción.' : '3 grupos separados por guion, por ejemplo 123-456-789 o 123-456A-789.'}>
       <input
-        id="lote_id" type="text" value={value} autoComplete="off" autoCapitalize="characters" placeholder="123-456-789"
+        id="lote_id" type="text" value={value} disabled={bloqueado} autoComplete="off" autoCapitalize="characters" placeholder="123-456-789"
         aria-invalid={Boolean(error)} aria-describedby={error ? 'lote_id-error' : undefined} aria-required
         onChange={(e) => onChange(e.target.value.toUpperCase())}
       />

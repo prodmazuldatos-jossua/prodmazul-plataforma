@@ -2,5 +2,5 @@
   "name": "prodmazul-pruebas-restauracion",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node restauracion.test.mjs" }
+  "scripts": { "test": "node restauracion.test.mjs && node limpieza_storage.test.mjs" }
 }

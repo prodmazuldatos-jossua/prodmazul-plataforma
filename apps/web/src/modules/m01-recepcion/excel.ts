@@ -1,4 +1,5 @@
 import { construirXlsx, type HojaXlsx } from '../../lib/xlsx';
+import { textoCantidad } from '../../lib/texto';
 import type { EstadoRecepcion } from './tipos';
 
 /** Lo que devuelve api_m01_exportar: todas las columnas guardadas (pesos en libras, tal como se guardan). */
@@ -69,7 +70,40 @@ const RECEPCIONES: Def[] = [
   { titulo: 'Identificador de envío', campo: 'client_uuid', ancho: 38 },
 ];
 
-/** Arma las hojas del libro: una fila por recepción y una hoja por cada tabla que se guarda con ella. */
+/**
+ * Hoja «Consolidado»: un resumen corto, una fila por recepción, con solo las columnas de control.
+ * No incluye las recepciones anuladas ni las eliminadas (esas siguen en la hoja «Recepciones», con su estado).
+ */
+export function hojaConsolidado(d: DatosExportacion): HojaXlsx {
+  const vigentes = d.recepciones.filter((r) => r.estado === 'borrador' || r.estado === 'cerrado');
+  const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number(v));
+  const llego = (r: Record<string, unknown>) => {
+    const n = num(r.num_gavetas_bines);
+    const tipo = r.llegada_en === 'gavetas' ? 'gavetas' : r.llegada_en === 'bines' ? 'bines' : null;
+    return n !== null && tipo ? textoCantidad(n, tipo) : '';
+  };
+  return {
+    nombre: 'Consolidado',
+    columnas: [
+      { titulo: 'Recepción', ancho: 20 },
+      { titulo: 'Fecha', formato: 'fecha', ancho: 12 },
+      { titulo: 'Guía', ancho: 18 },
+      { titulo: 'Lote', ancho: 14 },
+      { titulo: 'Proveedor', ancho: 28 },
+      { titulo: 'Especie', ancho: 18 },
+      { titulo: 'Llegó', ancho: 12 },
+      { titulo: 'Libras reportadas', formato: 'dec2', ancho: 16 },
+      { titulo: 'Libras planta', formato: 'dec2', ancho: 14 },
+      { titulo: 'Diferencia', formato: 'dec2', ancho: 12 },
+    ],
+    filas: vigentes.map((r) => [
+      r.recepcion_id, r.fecha_llegada, r.guia_remision, r.lote_id, r.proveedor, r.especie, llego(r),
+      num(r.libras_reportadas), num(r.libras_planta), num(r.diferencia_lb),
+    ]),
+  };
+}
+
+/** Arma las hojas del libro: una fila por recepción, una hoja por cada tabla que se guarda con ella y el consolidado al final. */
 export function hojasExcel(d: DatosExportacion): HojaXlsx[] {
   return [
     hoja('Recepciones', RECEPCIONES, d.recepciones),
@@ -102,6 +136,7 @@ export function hojasExcel(d: DatosExportacion): HojaXlsx[] {
       { titulo: 'Confirmada', campo: 'confirmada', ancho: 11, ver: siNo },
       { titulo: 'Respaldada en Drive el', campo: 'respaldo_drive_en', formato: 'fechahora', ancho: 18 },
     ], d.fotos),
+    hojaConsolidado(d),
   ];
 }
 

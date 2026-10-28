@@ -2,7 +2,7 @@ import {
   FORMATO_LOTE_POR_DEFECTO, MAX_LECTURAS, NUM_GAVETAS_MAX, type AlmacenamientoForm, type Errores, type ErroresFilas, type FormRecepcion,
 } from './tipos';
 import { normalizar } from '../../lib/texto';
-import { totalPesos } from './calculos';
+import { gavetasVisibles, totalPesos } from './calculos';
 
 export interface ContextoValidacion {
   /** Expresión regular del lote (viene de la configuración de la base de datos). */
@@ -30,11 +30,6 @@ export function loteValido(lote: string, formatoLote: string = FORMATO_LOTE_POR_
 export function filaEnUso(f: AlmacenamientoForm): boolean {
   return f.num_bin.trim() !== '' || f.sellos_recepcion.trim() !== '' || f.sellos_almacenamiento.trim() !== ''
     || f.temperatura_c !== null || f.libras_aprox !== null;
-}
-
-/** Gavetas con peso registrado: son las únicas a las que se les puede poner una temperatura. */
-export function gavetasConPeso(gavetas: (number | null)[]): number[] {
-  return gavetas.flatMap((g, i) => (g !== null && g > 0 ? [i + 1] : []));
 }
 
 /** Mismas reglas que la base de datos, para avisar en el campo antes de enviar. Devuelve un mensaje por campo. */
@@ -113,8 +108,8 @@ export function validarRecepcion(f: FormRecepcion, c: ContextoValidacion): Error
     if (Object.keys(fe).length > 0) filas.almacenamiento[i] = fe;
   }
 
-  // ---- Sección 3: temperaturas por gaveta (una por gaveta, y la gaveta debe tener peso)
-  const conPeso = new Set(gavetasConPeso(f.gavetas));
+  // ---- Sección 3: temperaturas por gaveta (una por gaveta; el peso de la gaveta es opcional)
+  const visibles = gavetasVisibles(f);
   const vistasGaveta = new Map<number, number>();
   f.temperaturas.slice(0, MAX_LECTURAS).forEach((l, i) => {
     const le: { num_gaveta?: string; temperatura_c?: string } = {};
@@ -123,7 +118,7 @@ export function validarRecepcion(f: FormRecepcion, c: ContextoValidacion): Error
     if (tieneGaveta && !tieneTemp) le.temperatura_c = 'Falta la temperatura de esta gaveta.';
     if (!tieneGaveta && tieneTemp) le.num_gaveta = 'Elige a qué gaveta corresponde esta temperatura.';
     if (tieneGaveta) {
-      if (!conPeso.has(l.num_gaveta!)) le.num_gaveta = `La gaveta ${l.num_gaveta} no tiene peso registrado. Elige otra o pesa esa gaveta.`;
+      if (l.num_gaveta! < 1 || l.num_gaveta! > visibles) le.num_gaveta = `La gaveta ${l.num_gaveta} no está en la sección 2. Elige otra.`;
       else if (vistasGaveta.has(l.num_gaveta!)) le.num_gaveta = `La gaveta ${l.num_gaveta} ya tiene temperatura en la fila ${vistasGaveta.get(l.num_gaveta!)! + 1}.`;
       else vistasGaveta.set(l.num_gaveta!, i);
     }
@@ -135,9 +130,8 @@ export function validarRecepcion(f: FormRecepcion, c: ContextoValidacion): Error
 
   // ---- Cierre
   if (c.cerrando) {
-    if (f.libras_reportadas === null && !e.libras_reportadas) e.libras_reportadas = 'Para cerrar indica las libras reportadas.';
-    if (f.libras_planta === null && !e.libras_planta) e.libras_planta = 'Para cerrar indica las libras de planta.';
-    if (f.gavetas.every((g) => g === null)) e.gavetas = 'Para cerrar la recepción registra el peso de al menos una gaveta.';
+    if (f.libras_reportadas === null && !e.libras_reportadas) e.libras_reportadas = 'Para cerrar indica el peso reportado.';
+    if (f.libras_planta === null && !e.libras_planta) e.libras_planta = 'Para cerrar indica el peso planta.';
   }
 
   if (Object.keys(filas.gavetas).length || Object.keys(filas.lecturas).length || Object.keys(filas.almacenamiento).length) e.filas = filas;

@@ -1,4 +1,6 @@
 export const NUM_GAVETAS_MAX = 30;
+/** Cuántas casillas de gaveta se muestran al empezar; con «+ Agregar gaveta» se pueden mostrar hasta NUM_GAVETAS_MAX. */
+export const GAVETAS_INICIALES = 2;
 export const LECTURAS_POR_DEFECTO = 2;
 export const MAX_LECTURAS = 30;
 export const MAX_FILAS_ALMACENAMIENTO = 40;
@@ -36,6 +38,8 @@ export interface FormRecepcion {
   observacion: string;
   /** Las 30 casillas de peso de gaveta (posición 0 = gaveta 1). null = sin pesar. */
   gavetas: (number | null)[];
+  /** Cuántas casillas de gaveta se muestran (2 al empezar; se agregan de una en una). Ausente en pendientes guardados antes de este cambio. */
+  gavetas_visibles?: number;
   /** Temperaturas de referencia de algunas gavetas (por defecto 2 filas; se pueden agregar más). */
   temperaturas: LecturaForm[];
   /** true = este es el último camión del lote y el lote se cierra al guardar y cerrar. */
@@ -111,6 +115,9 @@ export interface RespuestaEstado { recepcion_id: string; estado: EstadoRecepcion
 /** Una foto ya guardada de una recepción (api_m01_fotos_recepcion). */
 export interface FotoRemota {
   foto_id: string; nn: number; nombre: string; tipo_mime: string; tamano_bytes: number; ruta: string; subido_en: string;
+  /** true cuando la foto ya se borró de Supabase (pasó la retención) y solo queda la copia en Drive. */
+  archivada?: boolean;
+  archivada_en?: string | null;
 }
 
 /** Una foto elegida en el formulario que todavía no se sube (se sube al guardar la recepción). */

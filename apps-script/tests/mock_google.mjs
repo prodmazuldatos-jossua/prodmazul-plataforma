@@ -93,6 +93,11 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
         recurso.values.forEach((fila, i) => fila.forEach((v, j) => h.poner(a.r1 + i, a.c1 + j, v)));
         return {};
       },
+      clear(recurso, id, rango) {
+        const a = analizar(rango); const h = buscarHoja(id, a.hoja);
+        for (let r = a.r1; r <= Math.min(a.r2, h.filas.length); r++) { const f = h.filas[r - 1] || []; for (let c = a.c1; c <= Math.min(a.c2, f.length); c++) f[c - 1] = ''; }
+        return {};
+      },
       batchUpdate(recurso, id) {
         if (recurso.valueInputOption !== 'RAW') throw new Error('El receptor debe escribir en modo RAW');
         recurso.data.forEach((d) => { const a = analizar(d.range); const h = buscarHoja(id, a.hoja); d.values.forEach((fila, i) => fila.forEach((v, j) => h.poner(a.r1 + i, a.c1 + j, v))); });
@@ -130,7 +135,7 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
   }
   class CarpetaDrive {
     constructor(nombre, padre) { this.id = nuevoId(); this.nombre = nombre; this.padre = padre; this.sub = []; this.arch = []; this.papelera = false; this.acceso = 'PRIVATE'; R.carpetas[this.id] = this; }
-    getId() { return this.id; } getName() { return this.nombre; } isTrashed() { return this.papelera; }
+    getId() { return this.id; } getName() { return this.nombre; } isTrashed() { return this.papelera; } setTrashed(b) { this.papelera = b; return this; }
     getFoldersByName(n) { return iter(this.sub.filter((c) => c.nombre === n)); }
     getFolders() { return iter(this.sub.slice()); }
     createFolder(n) { const c = new CarpetaDrive(n, this); this.sub.push(c); return c; }
@@ -148,7 +153,7 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
     getOwner: () => (l.dueno ? { getEmail: () => l.dueno } : null)
   });
   const ctx = vm.createContext({
-    Date: Fecha, console, JSON, Math, Object, Array, String, Number, Error, RegExp,
+    Date: Fecha, console, Logger: { log() {} }, JSON, Math, Object, Array, String, Number, Error, RegExp,
     PropertiesService: { getScriptProperties: () => ({
       getProperty: (k) => (k in R.props ? R.props[k] : null), setProperty: (k, v) => { R.props[k] = String(v); },
       getProperties: () => ({ ...R.props }), deleteProperty: (k) => { delete R.props[k]; } }) },
@@ -182,6 +187,7 @@ export function crearEntorno({ ahora = '2026-10-26T15:00:00Z', yo = 'datos@gmail
     Sheets
   });
   vm.runInContext(fs.readFileSync(new URL('../Codigo.gs', import.meta.url), 'utf8'), ctx);
+  vm.runInContext(fs.readFileSync(new URL('../Limpieza.gs', import.meta.url), 'utf8'), ctx);
   R.llamar = (body) => {
     const r = ctx.doPost({ postData: { contents: typeof body === 'string' ? body : JSON.stringify(body) } });
     return JSON.parse(r.getContent());

@@ -1,3 +1,5 @@
+import { GAVETAS_INICIALES, NUM_GAVETAS_MAX } from './tipos';
+
 /** Cálculos del formulario. Redondeo «half away from zero» a 2 decimales, igual que la base de datos. */
 export function redondear(x: number, decimales = 2): number {
   const f = 10 ** decimales;
@@ -61,4 +63,15 @@ export function totalPesos(gavetas: (number | null)[]): number {
 /** Suma de las libras aproximadas de las filas de almacenamiento. */
 export function totalLibrasAprox(filas: { libras_aprox: number | null }[]): number {
   return redondear(filas.reduce((s, f) => s + (f.libras_aprox ?? 0), 0));
+}
+
+/**
+ * Cuántas casillas de gaveta se muestran: lo elegido con «+ Agregar gaveta», pero nunca menos de 2 ni menos de
+ * lo necesario para que se vea cada gaveta con peso o con temperatura (por ejemplo, al abrir una recepción guardada).
+ */
+export function gavetasVisibles(f: { gavetas: (number | null)[]; temperaturas: { num_gaveta: number | null }[]; gavetas_visibles?: number }): number {
+  let n = Math.max(GAVETAS_INICIALES, f.gavetas_visibles ?? 0);
+  f.gavetas.forEach((g, i) => { if (g !== null) n = Math.max(n, i + 1); });
+  f.temperaturas.forEach((t) => { if (t.num_gaveta !== null) n = Math.max(n, t.num_gaveta); });
+  return Math.min(NUM_GAVETAS_MAX, n);
 }

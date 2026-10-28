@@ -65,11 +65,15 @@ describe('validarRecepcion (borrador)', () => {
 });
 
 describe('validarRecepcion (cerrar)', () => {
-  it('exige libras reportadas, libras de planta y al menos una gaveta', () => {
+  it('exige el peso reportado y el peso planta', () => {
     const e = validarRecepcion(base({ libras_reportadas: null, libras_planta: null }), ctx({ cerrando: true }));
-    expect(e.libras_reportadas).toBeDefined();
-    expect(e.libras_planta).toBeDefined();
-    expect(e.gavetas).toMatch(/gaveta/);
+    expect(e.libras_reportadas).toMatch(/peso reportado/);
+    expect(e.libras_planta).toMatch(/peso planta/);
+  });
+  it('el peso de las gavetas ya NO es obligatorio para cerrar', () => {
+    const e = validarRecepcion(base(), ctx({ cerrando: true }));
+    expect(e.gavetas).toBeUndefined();
+    expect(e).toEqual({});
   });
   it('con todo completo no hay errores', () => {
     const f = base({ gavetas: conPesos({ 0: 50 }) });
@@ -150,9 +154,13 @@ describe('temperaturas por gaveta', () => {
     expect(e.filas?.lecturas[0]?.temperatura_c).toBeDefined();
     expect(e.filas?.lecturas[1]?.num_gaveta).toBeDefined();
   });
-  it('la gaveta debe tener peso registrado', () => {
+  it('la gaveta puede no tener peso: el peso es opcional', () => {
     const e = validarRecepcion(base({ gavetas: gav, temperaturas: lects({ num_gaveta: 7, temperatura_c: 2 }) }), ctx());
-    expect(e.filas?.lecturas[0]?.num_gaveta).toMatch(/no tiene peso/);
+    expect(e.filas).toBeUndefined();
+    expect(validarRecepcion(base({ temperaturas: lects({ num_gaveta: 2, temperatura_c: 2 }) }), ctx({ cerrando: true }))).toEqual({});
+  });
+  it('solo se aceptan gavetas de la 1 a la 30', () => {
+    expect(validarRecepcion(base({ temperaturas: lects({ num_gaveta: 0, temperatura_c: 2 }) }), ctx()).filas?.lecturas[0]?.num_gaveta).toBeDefined();
   });
   it('una gaveta no puede tener dos temperaturas', () => {
     const e = validarRecepcion(base({ gavetas: gav, temperaturas: lects({ num_gaveta: 2, temperatura_c: 1 }, { num_gaveta: 2, temperatura_c: 3 }) }), ctx());
@@ -169,9 +177,9 @@ describe('temperaturas por gaveta', () => {
     const p = aPayload(f, { client_uuid: 'u', estado: 'borrador', loteExiste: false });
     expect(p.temperaturas).toEqual([{ lectura_id: 1, num_gaveta: 30, temperatura_c: -1.5 }, { lectura_id: 2, num_gaveta: 1, temperatura_c: 2 }]);
   });
-  it('quitar el peso de una gaveta invalida su temperatura', () => {
+  it('quitar el peso de una gaveta ya no invalida su temperatura', () => {
     const f = base({ gavetas: conPesos({ 0: 50 }), temperaturas: lects({ num_gaveta: 5, temperatura_c: 2 }) });
-    expect(validarRecepcion(f, ctx()).filas?.lecturas[0]?.num_gaveta).toBeDefined();
+    expect(validarRecepcion(f, ctx()).filas).toBeUndefined();
   });
 });
 

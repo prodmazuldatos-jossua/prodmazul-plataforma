@@ -1,11 +1,10 @@
-Fase 5 - Parte 11: Aceptacion y cierre de la Fase 5
+Limpieza total para empezar en produccion
 Archivos nuevos:
-  herramientas/csv.mjs, restaurar-desde-sheets.mjs, restaurar-fotos.mjs   (restauracion desde Sheets y Drive)
-  tests/restauracion/        (28 pruebas de las herramientas; npm test)
-  tests/sql/fase5_parte11.mjs (prueba completa opcional: base -> CSV -> base vacia -> comparacion)
-  docs/revision_seguridad_f5.sql (revision de seguridad de SOLO LECTURA para el SQL Editor)
-  docs/manuales/             (Manual del operador, Manual del administrador e Informe de cierre de la Fase 5)
-Archivos incluidos sin cambios: herramientas/verificar-seguridad.mjs
-Esta parte NO cambia la base (sin migracion), ni la aplicacion web, ni el receptor, ni las Edge Functions.
-Las herramientas NO se conectan a tu base real: leen archivos y escriben SQL que tu decides donde ejecutar.
-Secretos: ninguno. La clave de servicio de restaurar-fotos se define solo en la ventana (variable de entorno), nunca en un archivo.
+  docs/limpiar_produccion.sql                 (borra los datos de la base; simula primero; confirma con 'SI BORRAR TODO')
+  herramientas/limpiar-fotos-storage.mjs      (borra las fotos de Supabase Storage; --confirmo)
+  apps-script/Limpieza.gs                     (archivo APARTE para el Apps Script del receptor; solo se ejecuta a mano)
+  apps-script/tests/limpieza.test.mjs         (16 pruebas)  y  tests/restauracion/limpieza_storage.test.mjs (9 pruebas)
+Archivos actualizados: apps-script/tests/mock_google.mjs (simulacion de Google ampliada), tests/restauracion/package.json
+NO cambia la aplicacion web, ni la estructura de la base, ni el receptor (Codigo.gs).
+ESTO BORRA DATOS DE FORMA DEFINITIVA: haz primero la copia de seguridad.
+Secretos: ninguno. La clave de servicio se escribe solo en la ventana (Read-Host), nunca en un archivo.

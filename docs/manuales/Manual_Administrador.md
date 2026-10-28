@@ -287,7 +287,7 @@ Límites: las cuentas de acceso deben existir antes (se restauran desde `cuentas
 ## 15. Configuración, catálogo y usuarios (pantallas)
 
 - **Configuración** (menú): solo 8 parámetros, cada uno con límites: días de retención de fotos (7–3650), horas de gracia de la purga (1–720), máximo por corrida de purga (1–1000), factor libras→kg (2,2–2,21), máximo de fotos por recepción (1–20), formato del lote, horas de alerta de sincronización (1–168) y días de historial de envíos (1–365). Cada cambio queda en la auditoría.
-- **Catálogo:** si hay proveedores o especies repetidos (por ejemplo «Mar Azul» y «MarAzul»), usa **Unir**: el nombre que sobra pasa a ser un **alias**, las recepciones y lotes pasan al nombre que queda, y la acción se audita. **No se deshace** desde la pantalla.
+- **Catálogo:** el botón **+ Nuevo proveedor** (o **+ Nueva especie**) crea un nombre a mano con solo el nombre; si ya existe, o se parece a otro, te avisa. Si hay proveedores o especies repetidos (por ejemplo «Mar Azul» y «MarAzul»), usa **Unir**: el nombre que sobra pasa a ser un **alias**, las recepciones y lotes pasan al nombre que queda, y la acción se audita. **No se deshace** desde la pantalla.
 - **Usuarios:** crear, cambiar rol, desactivar/reactivar y cambiar contraseña desde la aplicación (la contraseña **nunca** se muestra ni se guarda en el historial). Las consultas de las secciones 3 a 6 quedan como alternativa.
 
 ## 16. Plan Pro de Supabase y almacenamiento de la cuenta DATOS

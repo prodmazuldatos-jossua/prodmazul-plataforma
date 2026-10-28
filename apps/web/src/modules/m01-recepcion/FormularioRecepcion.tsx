@@ -3,7 +3,7 @@ import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../core/auth/AuthContext';
 import { Alerta, Modal } from '../../core/ui';
 import { PesoInput, useUnidad } from '../../lib/unidades';
-import { totalPesos } from './calculos';
+import { gavetasVisibles, totalPesos } from './calculos';
 import { aApiError, mensajeDe } from '../../lib/errores';
 import { hoyEcuador } from '../../lib/fechas';
 import { Campo, CampoTexto, Conmutador } from './controles';
@@ -23,7 +23,7 @@ import type { FotoPendiente, Pendiente } from '../../offline/db';
 import { useOnline } from '../../lib/conexion';
 import { recepcionAForm } from './mapeo';
 import { aPayload, erroresPorSeccion, validarRecepcion } from './esquema';
-import { FORMATO_LOTE_POR_DEFECTO, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type FotoNueva, type InfoLote, type RecepcionDetalle, type RespuestaGuardar } from './tipos';
+import { FORMATO_LOTE_POR_DEFECTO, GAVETAS_INICIALES, NUM_GAVETAS_MAX, filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type CampoForm, type AlmacenamientoForm, type LecturaForm, type Errores, type FormRecepcion, type FotoNueva, type InfoLote, type RecepcionDetalle, type RespuestaGuardar } from './tipos';
 import { Icono } from '../../core/iconos';
 
 const ORDEN_CAMPOS: CampoForm[] = [
@@ -34,7 +34,7 @@ const ORDEN_CAMPOS: CampoForm[] = [
 const vacio = (): FormRecepcion => ({
   fecha_llegada: hoyEcuador(), placa_vehiculo: '', lote_id: '', proveedor: '', especie: '', piscina: '', guia_remision: '',
   llegada_en: 'bines', num_gavetas_bines: '', libras_reportadas: null, libras_planta: null, hora_inicio_descarga: '', hora_fin_descarga: '',
-  observacion: '', cerrar_lote: true, gavetas: gavetasVacias(), temperaturas: lecturasVacias(), almacenamiento: [filaAlmacenamientoVacia()],
+  observacion: '', cerrar_lote: true, gavetas: gavetasVacias(), gavetas_visibles: GAVETAS_INICIALES, temperaturas: lecturasVacias(), almacenamiento: [filaAlmacenamientoVacia()],
 });
 
 type Mensaje = { tipo: 'exito' | 'error' | 'aviso'; texto: string } | null;
@@ -156,6 +156,18 @@ function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
     setF((p) => ({ ...p, gavetas: p.gavetas.map((g, k) => (k === i ? lb : g)) }));
     setSucio(true); setMensaje(null);
     setErrores((e) => (e.filas?.gavetas[i] || e.gavetas ? { ...e, gavetas: undefined, filas: e.filas && { ...e.filas, gavetas: { ...e.filas.gavetas, [i]: undefined as never } } } : e));
+  }, []);
+  const agregarGaveta = useCallback(() => {
+    setF((p) => ({ ...p, gavetas_visibles: Math.min(NUM_GAVETAS_MAX, gavetasVisibles(p) + 1) }));
+    setSucio(true); setMensaje(null);
+  }, []);
+  const quitarGaveta = useCallback(() => {
+    setF((p) => {
+      const n = gavetasVisibles(p);
+      const ocupada = p.gavetas[n - 1] !== null || p.temperaturas.some((t) => t.num_gaveta === n);
+      return n <= GAVETAS_INICIALES || ocupada ? p : { ...p, gavetas_visibles: n - 1 };
+    });
+    setSucio(true); setMensaje(null);
   }, []);
   const cambiarLecturas = useCallback((lecturas: LecturaForm[]) => {
     setF((p) => ({ ...p, temperaturas: lecturas }));
@@ -316,6 +328,7 @@ function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
   };
 
   const heredado = infoLote?.existe === true;
+  const visibles = gavetasVisibles(f);
   /** Aviso inmediato: las libras no pueden ser menores que el peso total de las gavetas ya escritas. */
   const totalGavetas = totalPesos(f.gavetas);
   const avisoLibras = (lb: number | null) =>
@@ -331,6 +344,12 @@ function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
         {meta && !editando && <> Guardada como borrador: <strong>{meta.id}</strong>.</>}
         {editando && <> Estado actual: <strong>{inicial?.estado === 'cerrado' ? 'cerrada' : 'borrador'}</strong>.</>}
       </p>
+      {editando && (
+        <p className="aviso-campo aviso-nuevo" data-testid="aviso-campos-bloqueados">
+          Los campos en gris no se pueden modificar: <strong>fecha de llegada, lote, proveedor y «Realizado por»</strong>.
+          Si alguno se registró mal, anula esta recepción y crea una nueva.
+        </p>
+      )}
       <NavSecciones errores={erroresPorSeccion(errores)} />
       {mensaje && <Alerta tipo={mensaje.tipo}>{mensaje.texto}</Alerta>}
       {conflicto && onRecargar && (
@@ -345,14 +364,15 @@ function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
         <h2 id="sec1" className="titulo-seccion"><Icono nombre="nota" />1. Datos generales</h2>
         <div className="rejilla-form">
           <CampoTexto id="fecha_llegada" etiqueta="Fecha de llegada" tipo="date" obligatorio value={f.fecha_llegada}
-                      onChange={(v) => cambiar('fecha_llegada', v)} error={errores.fecha_llegada} />
+                      onChange={(v) => cambiar('fecha_llegada', v)} error={errores.fecha_llegada} deshabilitado={editando}
+                      ayuda={editando ? 'La fecha forma parte del N.º de recepción y no se modifica.' : undefined} />
           <CampoTexto id="placa_vehiculo" etiqueta="Placa del vehículo" mayusculas value={f.placa_vehiculo}
                       onChange={(v) => cambiar('placa_vehiculo', v)} error={errores.placa_vehiculo} maxLength={20} />
           <CampoLote value={f.lote_id} onChange={(v) => cambiar('lote_id', v)} formatoLote={formatoLote}
-                     error={errores.lote_id} onInfo={recibirInfoLote} />
+                     error={errores.lote_id} onInfo={recibirInfoLote} bloqueado={editando} />
           <SelectorCatalogo id="proveedor" etiqueta="Proveedor" tipo="proveedores" obligatorio value={f.proveedor}
-                            onChange={(v) => cambiar('proveedor', v)} error={errores.proveedor} bloqueado={heredado}
-                            ayudaBloqueado="Tomado del lote existente." />
+                            onChange={(v) => cambiar('proveedor', v)} error={errores.proveedor} bloqueado={heredado || editando}
+                            ayudaBloqueado={editando ? 'Se toma del lote y no se modifica.' : 'Tomado del lote existente.'} />
           <SelectorCatalogo id="especie" etiqueta="Especie" tipo="especies" obligatorio value={f.especie}
                             onChange={(v) => cambiar('especie', v)} error={errores.especie} />
           <CampoTexto id="piscina" etiqueta="Piscina" value={f.piscina} onChange={(v) => cambiar('piscina', v)}
@@ -372,9 +392,9 @@ function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
           </div>
           <CampoTexto id="num_gavetas_bines" etiqueta="N.º de gavetas o bines" obligatorio modo="numeric" value={f.num_gavetas_bines}
                       onChange={(v) => cambiar('num_gavetas_bines', v.replace(/\D/g, ''))} error={errores.num_gavetas_bines} maxLength={4} />
-          <PesoInput id="libras_reportadas" etiqueta="Libras reportadas" value={f.libras_reportadas}
+          <PesoInput id="libras_reportadas" etiqueta="Peso reportado" value={f.libras_reportadas}
                      onChange={(v) => cambiar('libras_reportadas', v)} error={errores.libras_reportadas ?? avisoLibras(f.libras_reportadas)} />
-          <PesoInput id="libras_planta" etiqueta="Libras de planta" value={f.libras_planta}
+          <PesoInput id="libras_planta" etiqueta="Peso planta" value={f.libras_planta}
                      onChange={(v) => cambiar('libras_planta', v)} error={errores.libras_planta ?? avisoLibras(f.libras_planta)} />
           <CampoTexto id="hora_inicio_descarga" etiqueta="Hora de inicio de descarga" tipo="time" value={f.hora_inicio_descarga}
                       onChange={(v) => cambiar('hora_inicio_descarga', v)} error={errores.hora_inicio_descarga} />
@@ -385,10 +405,11 @@ function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
 
       <PanelCalculos f={f} />
 
-      <SeccionGavetas gavetas={f.gavetas} errores={errores} onCambiar={cambiarGaveta} />
-      <SeccionTemperaturas lecturas={f.temperaturas} gavetas={f.gavetas} errores={errores} onCambiar={cambiarLecturas} />
+      <SeccionGavetas gavetas={f.gavetas} visibles={visibles} errores={errores} onCambiar={cambiarGaveta}
+                      onAgregar={agregarGaveta} onQuitar={quitarGaveta} ultimaConTemperatura={f.temperaturas.some((t) => t.num_gaveta === visibles)} />
+      <SeccionTemperaturas lecturas={f.temperaturas} gavetas={f.gavetas} visibles={visibles} errores={errores} onCambiar={cambiarLecturas} />
       <SeccionAlmacenamiento filas={f.almacenamiento} errores={errores} onCambiar={cambiarAlmacenamiento}
-        datosQr={{ lote: f.lote_id.trim().toUpperCase(), fecha: f.fecha_llegada, guia: f.guia_remision, librasPlanta: f.libras_planta === null || f.libras_planta === undefined ? null : Number(f.libras_planta), proveedor: f.proveedor, especie: f.especie }} />
+        datosQr={{ lote: f.lote_id.trim().toUpperCase(), guia: f.guia_remision, proveedor: f.proveedor, especie: f.especie }} />
 
       <section className="tarjeta tarjeta-ancha" id="seccion-cierre" aria-labelledby="sec5">
         <h2 id="sec5" className="titulo-seccion"><Icono nombre="ok" />5. Cierre</h2>
@@ -420,7 +441,7 @@ function FormularioInterno({ inicial, onRecargar, pendiente }: Props) {
             )}
           </div>
           <Campo id="realizado_por" etiqueta="Realizado por">
-            <input id="realizado_por" type="text" readOnly value={(editando ? inicial?.realizado_por_nombre?.trim() : perfil?.nombre?.trim()) || perfil?.correo || ''} />
+            <input id="realizado_por" type="text" readOnly disabled={editando} value={(editando ? inicial?.realizado_por_nombre?.trim() : perfil?.nombre?.trim()) || perfil?.correo || ''} />
           </Campo>
           <div className="campo grupo-lote" id="seccion-fotos">
             <FotosEditor recepcionId={meta?.id} pendientes={fotosNuevas} setPendientes={setFotosNuevas} max={maxFotos}

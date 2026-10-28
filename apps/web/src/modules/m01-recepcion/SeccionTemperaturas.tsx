@@ -1,5 +1,4 @@
 import { TemperaturaInput } from './controles';
-import { gavetasConPeso } from './esquema';
 import { useUnidad } from '../../lib/unidades';
 import { MAX_LECTURAS, lecturaVacia, type Errores, type LecturaForm } from './tipos';
 import { Icono } from '../../core/iconos';
@@ -7,14 +6,16 @@ import { Icono } from '../../core/iconos';
 interface Props {
   lecturas: LecturaForm[];
   gavetas: (number | null)[];
+  /** Cuántas gaveta se muestran en la sección 2: son las que se pueden elegir aquí. */
+  visibles: number;
   errores: Errores;
   onCambiar: (lecturas: LecturaForm[]) => void;
 }
 
 /** Sección 3: temperatura de referencia de algunas gavetas. Por defecto 2 filas; se pueden agregar más. */
-export default function SeccionTemperaturas({ lecturas, gavetas, errores, onCambiar }: Props) {
+export default function SeccionTemperaturas({ lecturas, gavetas, visibles, errores, onCambiar }: Props) {
   const { texto } = useUnidad();
-  const conPeso = gavetasConPeso(gavetas);
+  const opciones = Array.from({ length: visibles }, (_, i) => i + 1);
   const cambiar = (i: number, c: Partial<LecturaForm>) => onCambiar(lecturas.map((l, k) => (k === i ? { ...l, ...c } : l)));
   const quitar = (i: number) => onCambiar(lecturas.length <= 1 ? [lecturaVacia()] : lecturas.filter((_, k) => k !== i));
 
@@ -22,14 +23,12 @@ export default function SeccionTemperaturas({ lecturas, gavetas, errores, onCamb
     <section className="tarjeta tarjeta-ancha" id="seccion-temperaturas" aria-labelledby="sec3" data-testid="seccion-temperaturas">
       <h2 id="sec3" className="titulo-seccion"><Icono nombre="termometro" />3. Temperaturas del producto (°C)</h2>
       <p className="texto-suave">
-        Temperatura de referencia de algunas gavetas. Elige la gaveta y escribe la temperatura; usa <strong>±</strong> para temperaturas bajo cero.
-        Si necesitas más gavetas, presiona <strong>+ Agregar gaveta</strong>.
+        Temperatura de referencia de algunas gavetas. Elige la gaveta (de las que ves en la sección 2) y escribe la temperatura; usa <strong>±</strong> para temperaturas bajo cero.
+        Si necesitas otra lectura, presiona <strong>+ Agregar temperatura</strong>.
       </p>
-      {conPeso.length === 0 && <p className="aviso-campo aviso-nuevo">Primero escribe el peso de las gavetas en la sección 2; aparecerán aquí para elegirlas.</p>}
       <div className="filas-temperatura">
         {lecturas.map((l, i) => {
           const err = errores.filas?.lecturas[i];
-          const sinPeso = l.num_gaveta !== null && !conPeso.includes(l.num_gaveta);
           return (
             <div className="lectura" key={i} data-testid={`lectura-${i + 1}`}>
               <p className="lectura-titulo">Temperatura {i + 1}</p>
@@ -40,8 +39,7 @@ export default function SeccionTemperaturas({ lecturas, gavetas, errores, onCamb
                           aria-describedby={err?.num_gaveta ? `lectura-${i + 1}-gaveta-error` : undefined}
                           onChange={(e) => cambiar(i, { num_gaveta: e.target.value === '' ? null : Number(e.target.value) })}>
                     <option value="">Elige la gaveta…</option>
-                    {sinPeso && <option value={l.num_gaveta!}>Gaveta {l.num_gaveta} (sin peso)</option>}
-                    {conPeso.map((n) => <option key={n} value={n}>Gaveta {n} ({texto(gavetas[n - 1])})</option>)}
+                    {opciones.map((n) => <option key={n} value={n}>{gavetas[n - 1] === null ? `Gaveta ${n}` : `Gaveta ${n} (${texto(gavetas[n - 1])})`}</option>)}
                   </select>
                   {err?.num_gaveta && <p className="error-campo" id={`lectura-${i + 1}-gaveta-error`}>{err.num_gaveta}</p>}
                 </div>
@@ -54,7 +52,7 @@ export default function SeccionTemperaturas({ lecturas, gavetas, errores, onCamb
         })}
       </div>
       <div className="acciones-fila">
-        <button type="button" className="boton-secundario" onClick={() => onCambiar([...lecturas, lecturaVacia()])} disabled={lecturas.length >= MAX_LECTURAS}>+ Agregar gaveta</button>
+        <button type="button" className="boton-secundario" onClick={() => onCambiar([...lecturas, lecturaVacia()])} disabled={lecturas.length >= MAX_LECTURAS}>+ Agregar temperatura</button>
       </div>
     </section>
   );

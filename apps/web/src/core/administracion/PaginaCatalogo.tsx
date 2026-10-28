@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alerta, Cargando, Modal, Vacio } from '../ui';
 import { Icono } from '../iconos';
 import { mensajeDe } from '../../lib/errores';
 import { formatoFecha } from '../../lib/fechas';
-import { listarCatalogo, unirCatalogo, type Catalogo, type ItemCatalogo, type TipoCatalogo } from './api';
-import { MOTIVO_MAXIMO, errorMotivo, gruposParecidos, textoUnion } from './administracion';
+import { crearCatalogo, listarCatalogo, unirCatalogo, type Catalogo, type ItemCatalogo, type TipoCatalogo } from './api';
+import { MOTIVO_MAXIMO, NOMBRE_CATALOGO_MAXIMO, errorMotivo, errorNombreCatalogo, gruposParecidos, textoUnion } from './administracion';
+import { parecidos } from '../../lib/texto';
 
 const TIPOS: { id: TipoCatalogo; texto: string }[] = [{ id: 'proveedores', texto: 'Proveedores' }, { id: 'especies', texto: 'Especies' }];
 
@@ -45,6 +46,43 @@ function VentanaUnir({ tipo, origen, todos, onCerrar, onListo }: { tipo: TipoCat
   );
 }
 
+function VentanaNuevo({ tipo, existentes, onCerrar, onListo }: { tipo: TipoCatalogo; existentes: string[]; onCerrar: () => void; onListo: (t: string) => void }) {
+  const [nombre, setNombre] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const singular = tipo === 'proveedores' ? 'proveedor' : 'especie';
+  const entrada = useRef<HTMLInputElement>(null);
+  // La ventana toma el foco al abrirse; después se lo pasamos al cuadro del nombre para poder escribir de inmediato.
+  useEffect(() => { const t = setTimeout(() => entrada.current?.focus(), 0); return () => clearTimeout(t); }, []);
+  const parecidosA = nombre.trim().length >= 3 ? parecidos(nombre.trim(), existentes).slice(0, 3) : [];
+  const enviar = async () => {
+    const e = errorNombreCatalogo(nombre, existentes, tipo);
+    if (e) { setError(e); return; }
+    setGuardando(true); setError(null);
+    try {
+      const r = await crearCatalogo(tipo, nombre.trim());
+      onListo(`Se creó ${tipo === 'proveedores' ? 'el proveedor' : 'la especie'} «${r.nombre}». Ya aparece en las recepciones nuevas.`);
+    } catch (x) { setError(mensajeDe(x)); setGuardando(false); }
+  };
+  return (
+    <Modal titulo={tipo === 'proveedores' ? 'Nuevo proveedor' : 'Nueva especie'} onCerrar={() => { if (!guardando) onCerrar(); }}
+           acciones={<>
+             <button type="button" className="boton-secundario" disabled={guardando} onClick={onCerrar}>Cancelar</button>
+             <button type="button" className="boton-primario" disabled={guardando} onClick={() => void enviar()}>{guardando ? 'Guardando…' : 'Crear'}</button>
+           </>}>
+      {error && <Alerta tipo="error">{error}</Alerta>}
+      <div className="campo"><label htmlFor="n-nombre">Nombre del {singular}</label>
+        <input id="n-nombre" type="text" value={nombre} maxLength={NOMBRE_CATALOGO_MAXIMO} autoComplete="off" ref={entrada}
+               onChange={(e) => { setNombre(e.target.value); setError(null); }}
+               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void enviar(); } }} />
+        <p className="ayuda">Escríbelo como quieres que aparezca en las recepciones.</p></div>
+      {parecidosA.length > 0 && (
+        <Alerta tipo="aviso"><span data-testid="aviso-parecidos">Hay nombres parecidos: {parecidosA.map((n) => `«${n}»`).join(', ')}. Si es el mismo, no lo crees: úsalo en la recepción.</span></Alerta>
+      )}
+    </Modal>
+  );
+}
+
 export default function PaginaCatalogo() {
   const [tipo, setTipo] = useState<TipoCatalogo>('proveedores');
   const [texto, setTexto] = useState('');
@@ -56,6 +94,7 @@ export default function PaginaCatalogo() {
   const [cargando, setCargando] = useState(true);
   const [origen, setOrigen] = useState<ItemCatalogo | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [creando, setCreando] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -75,7 +114,12 @@ export default function PaginaCatalogo() {
   return (
     <div>
       <div className="encabezado-lista"><h1>Catálogo</h1></div>
-      <p className="texto-suave">Revisa los proveedores y las especies. Si un mismo nombre quedó escrito de dos maneras, únelos: todo pasa al nombre que conserves.</p>
+      <p className="texto-suave">Revisa los proveedores y las especies, o crea uno nuevo. Si un mismo nombre quedó escrito de dos maneras, únelos: todo pasa al nombre que conserves.</p>
+      <div className="acciones-fila">
+        <button type="button" className="boton-primario" data-testid="boton-nuevo-catalogo" onClick={() => { setAviso(null); setCreando(true); }}>
+          + {tipo === 'proveedores' ? 'Nuevo proveedor' : 'Nueva especie'}
+        </button>
+      </div>
       {aviso && <Alerta tipo="exito">{aviso}</Alerta>}
       <div className="tabs" role="tablist" aria-label="Catálogo">
         {TIPOS.map((t) => (
@@ -117,6 +161,7 @@ export default function PaginaCatalogo() {
           )}
         </>
       )}
+      {creando && <VentanaNuevo tipo={tipo} existentes={todos.map((i) => i.nombre)} onCerrar={() => setCreando(false)} onListo={(t) => { setCreando(false); setAviso(t); setTexto(''); setBusqueda(''); setSolo(false); void cargar(); }} />}
       {origen && <VentanaUnir tipo={tipo} origen={origen} todos={todos} onCerrar={() => setOrigen(null)} onListo={(t) => { setOrigen(null); setAviso(t); void cargar(); }} />}
     </div>
   );

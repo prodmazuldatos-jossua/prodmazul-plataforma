@@ -1,3 +1,4 @@
+import { gavetasVisibles } from './calculos';
 import { filaAlmacenamientoVacia, gavetasVacias, lecturasVacias, type EstadoRecepcion, type FormRecepcion, type RecepcionDetalle } from './tipos';
 
 /** Convierte la recepción que devuelve la base de datos al estado del formulario (para editarla). */
@@ -11,6 +12,7 @@ export function recepcionAForm(r: RecepcionDetalle): FormRecepcion {
     libras_aprox: a.libras_aprox === null ? null : Number(a.libras_aprox),
   }));
   const num = (v: number | string | null) => (v === null || v === undefined ? null : Number(v));
+  const visibles = gavetasVisibles({ gavetas, temperaturas });
   return {
     fecha_llegada: r.fecha_llegada.slice(0, 10),
     placa_vehiculo: r.placa_vehiculo ?? '',
@@ -27,6 +29,7 @@ export function recepcionAForm(r: RecepcionDetalle): FormRecepcion {
     hora_fin_descarga: r.hora_fin_descarga ? r.hora_fin_descarga.slice(0, 5) : '',
     observacion: r.observacion ?? '',
     gavetas,
+    gavetas_visibles: visibles,
     temperaturas: temperaturas.length > 0 ? temperaturas : lecturasVacias(),
     almacenamiento: almacenamiento.length > 0 ? almacenamiento : [filaAlmacenamientoVacia()],
     cerrar_lote: false,

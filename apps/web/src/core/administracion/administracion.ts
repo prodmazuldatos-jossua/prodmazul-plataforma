@@ -1,3 +1,4 @@
+import { normalizar } from '../../lib/texto';
 // Lógica pura de las pantallas de administración (sin pantalla): validación de parámetros, textos de la auditoría,
 // filtros y paginación. La base de datos vuelve a validar todo: esto solo da respuesta rápida al escribir.
 import type { FiltrosAuditoria, ItemCatalogo, ParametroConfig } from './api';
@@ -104,4 +105,17 @@ export function gruposParecidos(items: ItemCatalogo[]): ItemCatalogo[][] {
 export function textoUnion(tipo: 'proveedores' | 'especies', origen: ItemCatalogo, destino: ItemCatalogo): string {
   const que = tipo === 'proveedores' ? 'El proveedor' : 'La especie';
   return `«${origen.nombre}» (${origen.recepciones} recepciones, ${origen.lotes} lotes) se unirá a «${destino.nombre}». ${que} «${origen.nombre}» dejará de existir como nombre aparte; si alguien lo escribe de nuevo, el sistema usará «${destino.nombre}». Esto no se puede deshacer desde la pantalla.`;
+}
+
+export const NOMBRE_CATALOGO_MINIMO = 2;
+export const NOMBRE_CATALOGO_MAXIMO = 120;
+
+/** Revisa el nombre de un proveedor o una especie nuevos. Devuelve el mensaje de error o null si está bien. */
+export function errorNombreCatalogo(nombre: string, existentes: string[], tipo: 'proveedores' | 'especies'): string | null {
+  const t = nombre.trim().replace(/\s+/g, ' ');
+  if (t.length < NOMBRE_CATALOGO_MINIMO) return `El nombre debe tener al menos ${NOMBRE_CATALOGO_MINIMO} caracteres.`;
+  if (t.length > NOMBRE_CATALOGO_MAXIMO) return `El nombre no puede superar los ${NOMBRE_CATALOGO_MAXIMO} caracteres.`;
+  const igual = existentes.find((n) => normalizar(n) === normalizar(t));
+  if (igual) return `Ya existe ${tipo === 'proveedores' ? 'el proveedor' : 'la especie'} «${igual}».`;
+  return null;
 }

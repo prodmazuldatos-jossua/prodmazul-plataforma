@@ -17,13 +17,15 @@ export function Campo({ id, etiqueta, error, ayuda, obligatorio, children }: Cam
 interface TextoProps {
   id: string; etiqueta: string; value: string; onChange: (v: string) => void; error?: string; ayuda?: string; obligatorio?: boolean;
   tipo?: 'text' | 'date' | 'time'; modo?: 'text' | 'numeric'; maxLength?: number; placeholder?: string; mayusculas?: boolean;
+  /** Campo que no se puede modificar (por ejemplo, la fecha al editar una recepción ya guardada). */
+  deshabilitado?: boolean;
 }
 
-export function CampoTexto({ id, etiqueta, value, onChange, error, ayuda, obligatorio, tipo = 'text', modo, maxLength, placeholder, mayusculas }: TextoProps) {
+export function CampoTexto({ id, etiqueta, value, onChange, error, ayuda, obligatorio, tipo = 'text', modo, maxLength, placeholder, mayusculas, deshabilitado }: TextoProps) {
   return (
     <Campo id={id} etiqueta={etiqueta} error={error} ayuda={ayuda} obligatorio={obligatorio}>
       <input
-        id={id} type={tipo} value={value} inputMode={modo} maxLength={maxLength} placeholder={placeholder}
+        id={id} type={tipo} value={value} inputMode={modo} maxLength={maxLength} placeholder={placeholder} disabled={deshabilitado}
         autoComplete="off" autoCapitalize={mayusculas ? 'characters' : 'off'}
         aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} aria-required={obligatorio}
         onChange={(e) => onChange(mayusculas ? e.target.value.toUpperCase() : e.target.value)}

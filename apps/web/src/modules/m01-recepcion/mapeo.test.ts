@@ -22,6 +22,11 @@ describe('recepcionAForm', () => {
     expect(f.gavetas[1]).toBeNull();
     expect(f.gavetas[2]).toBe(26);
   });
+  it('muestra las gavetas necesarias: las 2 de inicio o hasta la última con peso o temperatura', () => {
+    expect(recepcionAForm(base).gavetas_visibles).toBe(3);
+    expect(recepcionAForm({ ...base, gavetas: [], temperaturas: [] }).gavetas_visibles).toBe(2);
+    expect(recepcionAForm({ ...base, gavetas: [{ num_gaveta: 24, peso_lb: 20 }] }).gavetas_visibles).toBe(24);
+  });
   it('convierte textos vacíos y horas', () => {
     const f = recepcionAForm(base);
     expect(f.piscina).toBe('');

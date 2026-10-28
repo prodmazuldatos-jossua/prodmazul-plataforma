@@ -60,12 +60,12 @@ En **Recepción** toca **Nueva recepción**. El formulario tiene **5 secciones**
 | **Guía de remisión \*** | No se puede repetir: si ya existe, la aplicación avisa **«Ya existe una recepción con esa guía de remisión»** |
 | **El producto llegó en** | **Bines** (lo normal) o **Gavetas** |
 | **N.º de gavetas o bines \*** | La cantidad que **llegó**, como dice la guía. Es solo informativa: **no tiene que coincidir** con las gavetas que pesas |
-| **Libras reportadas / Libras de planta** | El peso que dice el proveedor y el que marca la báscula de planta. Se escriben en la unidad marcada arriba (Lb o Kg) |
+| **Peso reportado / Peso planta** | El peso que dice el proveedor y el que marca la báscula de planta. Se escriben en la unidad marcada arriba (Lb o Kg) |
 | **Hora de inicio / fin de descarga** | La de fin no puede ser anterior a la de inicio |
 
 ### 3.2. Gavetas (sección 2)
 
-Se pesa **una muestra** de gavetas (hasta **30**) para sacar el **peso promedio**. Escribe el peso de cada una; con **Enter** pasas a la siguiente. Las casillas que no uses se **dejan vacías**.
+Se pesa **una muestra** de gavetas (hasta **30**) para sacar el **peso promedio**. El peso de las gavetas es **opcional**. Al empezar ves **2 casillas**; si pesaste más, toca **+ Agregar gaveta** y aparece **una casilla más** (hasta 30). Con **Enter** pasas a la siguiente. Las casillas se reparten en grupos de 10 (**1-10, 11-20, 21-30**) y cada grupo aparece solo cuando lo necesitas. Con **Quitar la última gaveta** deshaces la última casilla si está vacía.
 
 - Debajo de cada grupo de 10 verás su **Peso promedio**.
 - Abajo ves **cuántas gavetas pesaste** y su **peso total**.
@@ -73,7 +73,7 @@ Se pesa **una muestra** de gavetas (hasta **30**) para sacar el **peso promedio*
 
 ### 3.3. Temperaturas (sección 3)
 
-Es la temperatura de **algunas gavetas** (por defecto hay **2 filas**). En cada fila: elige la **gaveta** (solo salen las que ya pesaste) y escribe la **temperatura en °C**. Para temperaturas **bajo cero** toca el botón **±**. Si necesitas más, toca **+ Agregar gaveta**; con **Quitar esta fila** eliminas una.
+Es la temperatura de **algunas gavetas** (por defecto hay **2 filas**). En cada fila: elige la **gaveta** (salen las que ves en la sección 2, tengan peso o no) y escribe la **temperatura en °C**. Para temperaturas **bajo cero** toca el botón **±**. Si necesitas más filas, toca **+ Agregar temperatura**; con **Quitar esta fila** eliminas una.
 
 ### 3.4. Almacenamiento (sección 4)
 
@@ -95,10 +95,10 @@ Una fila por **bin**: **N.º de bin**, **sello de recepción**, **sello de almac
 | Botón | Cuándo usarlo |
 |---|---|
 | **Guardar borrador** | Si todavía te falta información. Un borrador **nunca cierra el lote** y se puede completar después |
-| **Guardar y cerrar** | Cuando terminaste. Para cerrar se exige además: **libras reportadas**, **libras de planta** y **al menos una gaveta pesada** |
+| **Guardar y cerrar** | Cuando terminaste. Para cerrar se exige además: **peso reportado** y **peso planta** (el peso de las gavetas ya no es obligatorio) |
 | **Salir** | Sales del formulario. Si hay cambios sin guardar, la aplicación **pregunta** antes de perderlos |
 
-Si falta algo, la aplicación **te lo marca en rojo** junto al campo y te lleva a él. Cuando todo está bien aparece **«Recepción cerrada»** con el botón **Registrar otra recepción**.
+Si falta algo, la aplicación **te lo marca en rojo** junto al campo y te lleva a él. Cuando todo está bien, al presionar **Guardar borrador** o **Guardar y cerrar** la aplicación te **lleva al listado de recepciones** con un aviso verde: busca ahí tu recepción (con su número de **guía**) para comprobar que quedó guardada. Si no había señal, el aviso te dice que quedó **en la tablet** y se enviará sola.
 
 ---
 
@@ -109,9 +109,11 @@ En **Recepción** ves el listado.
 {{img:lista|Listado de recepciones}}
 
 - **Buscar:** escribe parte del número de recepción, la guía, el lote, la placa, el proveedor o la especie.
+- **Guía:** el número de guía de remisión se ve en su propia columna y también sirve para buscar.
 - **Estado:** **Activas** (borradores y cerradas), **Solo borradores**, **Solo cerradas**, **Anuladas** o **Todas**.
 - **Desde / Hasta:** filtra por fechas. **Quitar filtros** vuelve a empezar.
 - Toca una fila para abrir el **detalle** completo.
+- **Descargar Excel:** baja todas las recepciones con todas sus columnas. La hoja **Consolidado** (la última del libro) trae un resumen corto: recepción, fecha, guía, lote, proveedor, especie, llegó, libras reportadas, libras planta y diferencia (sin las anuladas ni las eliminadas).
 
 ---
 
@@ -136,9 +138,12 @@ Dentro del detalle hay botones según tus permisos:
 
 | Botón | Qué hace |
 |---|---|
-| **Editar** | Abre el formulario con los datos para corregirlos. **Solo puedes editar lo que tú registraste** |
+| **Editar** | Abre el formulario con los datos para corregirlos. **Solo puedes editar lo que tú registraste**. Los campos en gris (**fecha de llegada, lote, proveedor y «Realizado por»**) no se pueden modificar: si alguno está mal, anula la recepción y crea una nueva |
 | **Anular** | Marca la recepción como **Anulada** (queda guardada, pero no cuenta en los reportes). Pide un **motivo** de 5 a 500 caracteres |
 | **PDF** | Descarga la hoja para imprimir (sección 6) |
+| **QR** (en cada bin de «Almacenamiento de materia prima») | Genera y descarga una **imagen con el código QR de ese bin** (lote abajo; al escanearlo se ve lote, proveedor, especie y guía; las tildes y la «ñ» salen sin tilde para que lo lea cualquier lector). Solo se genera cuando tocas el botón; también está en el formulario, junto a cada bin |
+
+Cuando el administrador **elimina** una recepción, la aplicación vuelve al listado y ahí ya no aparece.
 
 Una recepción **no se borra**. Si necesitas que **desaparezca del todo de las listas** o recuperar una anulada, **pídeselo al administrador** (él puede **Eliminar** y **Reactivar**).
 
@@ -151,7 +156,7 @@ Una recepción **no se borra**. Si necesitas que **desaparezca del todo de las l
 1. Abre la recepción y toca **PDF**. Se descarga **un archivo** con el nombre `Recepcion_REC-AAAAMMDD-NNNN_lote-….pdf`. **No necesita señal** (si ya tienes la recepción abierta).
 2. El PDF respeta el interruptor **Lb / Kg**: si estaba en **Kg**, todos los pesos salen en kilos y el documento lo indica abajo.
 3. Ábrelo desde las descargas de la tablet e imprímelo en **A4 horizontal, tamaño real (100 %)**.
-4. Firma a mano: **«REALIZADO POR»** (tu nombre ya sale impreso) y **«REVISADO POR»**, con **ID** y **fecha**.
+4. Firma a mano: **«REALIZADO POR»** (sobre su línea sale impreso un **QR de firma** con el lote y tu nombre) y **«REVISADO POR»**, con **ID** y **fecha**.
 
 {{img:pdf_muestra|Ejemplo de la hoja en PDF}}
 
@@ -212,9 +217,9 @@ Menú **Cambiar mi contraseña** > escribe la **contraseña actual**, la **nueva
 
 - **Entrar** con tu correo y contraseña → **Recepción** → **Nueva recepción**.
 - **Obligatorio:** fecha, lote, proveedor (si el lote es nuevo), especie, guía de remisión, N.º de gavetas o bines.
-- **Para cerrar:** libras reportadas, libras de planta y mínimo 1 gaveta pesada.
+- **Para cerrar:** peso reportado y peso planta (las gavetas pesadas son opcionales).
 - **Lote abierto** si vienen más camiones; **Cerrar lote** solo en el último.
 - **Sin señal:** sigue; queda como **pendiente** y se envía sola. **No borres datos del navegador.**
-- **PDF:** botón **PDF** en el detalle → imprimir A4 horizontal → firmar **Realizado por** y **Revisado por**.
+- **PDF:** botón **PDF** en el detalle → imprimir A4 horizontal → firmar **Realizado por** (sobre su línea va el **QR de firma** con el lote y tu nombre) y **Revisado por**.
 - **Equivocaciones:** **Editar** (tuyas) o **Anular**. Para borrar o reactivar, pide al administrador.
 - **Reportes:** menú > **Reportes**; solo cuentan las recepciones **cerradas** y se miden en **libras de planta**.

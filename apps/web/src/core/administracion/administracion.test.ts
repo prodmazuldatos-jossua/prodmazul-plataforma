@@ -6,6 +6,7 @@ import type { ItemCatalogo } from './api';
 import {
   FILTROS_VACIOS, errorFiltros, errorMotivo, esIgual, etiquetaAccion, etiquetaModulo, gruposParecidos, hayFiltros,
   paramsAuditoria, resumenDetalle, textoRango, textoUnion, totalPaginas, validarParametro,
+  errorNombreCatalogo,
 } from './administracion';
 import PaginaConfiguracion from './PaginaConfiguracion';
 import PaginaAuditoria from './PaginaAuditoria';
@@ -122,5 +123,21 @@ describe('pantallas (primer dibujo)', () => {
   it('auditoría muestra los seis filtros y el botón Buscar', () => {
     const a = dibujar(PaginaAuditoria);
     for (const t of ['Desde', 'Hasta', 'Usuario', 'Módulo', 'Acción', 'Buscar']) expect(a).toContain(t);
+  });
+});
+
+describe('nombre nuevo del catálogo', () => {
+  const existentes = ['Camaronera Árbol', 'Productora del Sol'];
+  it('acepta un nombre nuevo', () => {
+    expect(errorNombreCatalogo('Acuícola Nueva', existentes, 'proveedores')).toBeNull();
+  });
+  it('pide al menos 2 caracteres y no más de 120', () => {
+    expect(errorNombreCatalogo(' A ', existentes, 'proveedores')).toMatch(/al menos 2/);
+    expect(errorNombreCatalogo('x'.repeat(121), existentes, 'especies')).toMatch(/120/);
+    expect(errorNombreCatalogo('x'.repeat(120), existentes, 'especies')).toBeNull();
+  });
+  it('rechaza un nombre que ya existe aunque cambien mayúsculas, tildes o espacios', () => {
+    expect(errorNombreCatalogo('  camaronera   ARBOL ', existentes, 'proveedores')).toBe('Ya existe el proveedor «Camaronera Árbol».');
+    expect(errorNombreCatalogo('productora del sol', existentes, 'especies')).toBe('Ya existe la especie «Productora del Sol».');
   });
 });

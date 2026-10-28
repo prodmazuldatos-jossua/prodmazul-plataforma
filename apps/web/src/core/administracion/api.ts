@@ -66,3 +66,11 @@ export async function unirCatalogo(tipo: TipoCatalogo, origen: string, destino: 
   if (error) throw aApiError(error);
   return data as ResultadoUnion;
 }
+
+export interface ResultadoCrearCatalogo { id: string; nombre: string; tipo: TipoCatalogo }
+/** Crea a mano un proveedor o una especie (solo el nombre). */
+export async function crearCatalogo(tipo: TipoCatalogo, nombre: string): Promise<ResultadoCrearCatalogo> {
+  const { data, error } = await supabase.rpc('api_admin_catalogo_crear', { p_tipo: tipo, p_nombre: nombre });
+  if (error) throw aApiError(error);
+  return data as ResultadoCrearCatalogo;
+}
